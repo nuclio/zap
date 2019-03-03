@@ -17,6 +17,8 @@ limitations under the License.
 package nucliozap
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -165,9 +167,19 @@ func (nz *NuclioZap) Error(format interface{}, vars ...interface{}) {
 	}
 }
 
+// ErrorCtx emits an unstructured debug log with context
+func (nz *NuclioZap) ErrorCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Errorw(nz.getFormatWithContext(ctx, format), vars...)
+}
+
 // ErrorWith emits error level log with arguments
 func (nz *NuclioZap) ErrorWith(format interface{}, vars ...interface{}) {
 	nz.SugaredLogger.Errorw(format.(string), vars...)
+}
+
+// ErrorWithCtx emits debug level log with arguments
+func (nz *NuclioZap) ErrorWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Errorw(format.(string), nz.addContextToVars(ctx, vars)...)
 }
 
 // Warn emits warn level log
@@ -180,9 +192,19 @@ func (nz *NuclioZap) Warn(format interface{}, vars ...interface{}) {
 	}
 }
 
+// WarnCtx emits an unstructured debug log with context
+func (nz *NuclioZap) WarnCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Warnw(nz.getFormatWithContext(ctx, format), vars...)
+}
+
 // WarnWith emits warn level log with arguments
 func (nz *NuclioZap) WarnWith(format interface{}, vars ...interface{}) {
 	nz.SugaredLogger.Warnw(format.(string), vars...)
+}
+
+// WarnWithCtx emits debug level log with arguments
+func (nz *NuclioZap) WarnWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Warnw(format.(string), nz.addContextToVars(ctx, vars)...)
 }
 
 // Info emits info level log
@@ -195,14 +217,19 @@ func (nz *NuclioZap) Info(format interface{}, vars ...interface{}) {
 	}
 }
 
+// InfoCtx emits an unstructured debug log with context
+func (nz *NuclioZap) InfoCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Infow(nz.getFormatWithContext(ctx, format), vars...)
+}
+
 // InfoWith emits info level log with arguments
 func (nz *NuclioZap) InfoWith(format interface{}, vars ...interface{}) {
 	nz.SugaredLogger.Infow(format.(string), vars...)
 }
 
-// DebugWith emits debug level log with arguments
-func (nz *NuclioZap) DebugWith(format interface{}, vars ...interface{}) {
-	nz.SugaredLogger.Debugw(format.(string), vars...)
+// InfoWithCtx emits debug level log with arguments
+func (nz *NuclioZap) InfoWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Infow(format.(string), nz.addContextToVars(ctx, vars)...)
 }
 
 // Debug emits debug level log
@@ -213,6 +240,21 @@ func (nz *NuclioZap) Debug(format interface{}, vars ...interface{}) {
 	} else {
 		nz.SugaredLogger.Debug(format)
 	}
+}
+
+// DebugCtx emits an unstructured debug log with context
+func (nz *NuclioZap) DebugCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Debugw(nz.getFormatWithContext(ctx, format), vars...)
+}
+
+// DebugWith emits debug level log with arguments
+func (nz *NuclioZap) DebugWith(format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Debugw(format.(string), vars...)
+}
+
+// DebugWithCtx emits debug level log with arguments
+func (nz *NuclioZap) DebugWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
+	nz.SugaredLogger.Debugw(format.(string), nz.addContextToVars(ctx, vars)...)
 }
 
 // Flush flushes the log
@@ -302,4 +344,40 @@ func (nz *NuclioZap) getEncoderConfig(encoding string) *zapcore.EncoderConfig {
 		EncodeCaller:     func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
 		EncodeLoggerName: zapcore.FullLoggerNameEncoder,
 	}
+}
+
+func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) []interface{} {
+	if ctx == nil {
+		return vars
+	}
+
+	// get request ID from context
+	requestID := ctx.Value("RequestID")
+
+	// if not set, don't add it to vars
+	if requestID == nil || requestID == "" {
+		return vars
+	}
+
+	// create a slice 2 slots larger
+	varsWithContext := make([]interface{}, 0, len(vars) + 2)
+	varsWithContext = append(varsWithContext, "requestID")
+	varsWithContext = append(varsWithContext, requestID)
+	varsWithContext = append(varsWithContext, vars...)
+
+	return varsWithContext
+}
+
+func (nz *NuclioZap) getFormatWithContext(ctx context.Context, format interface{}) string {
+	formatString := format.(string)
+
+	// get request ID from context
+	requestID := ctx.Value("RequestID")
+
+	// if not set, don't add it to vars
+	if requestID == nil || requestID == "" {
+		return formatString
+	}
+
+	return formatString + fmt.Sprintf(" (requestID: %s)", requestID)
 }
