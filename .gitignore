@@ -1,0 +1,41 @@
+*.class
+*.iml
+*.log
+.DS_Store
+.classpath
+.envrc
+.gradle
+.project
+.pytest_cache
+.settings
+.vagrant
+.vscode
+.testoutputs
+__pycache__
+test/http-bench/out/
+.DS_Store
+*.log
+hack/build/
+*.tmp/
+
+hack/env/
+
+# JetBrains
+*.sln.iml
+.idea/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Including strong name files can present a security risk
+# (https://github.com/github/gitignore/pull/2483#issue-259490424)
+#*.snk

@@ -35,6 +35,10 @@ func (ml *MuxLogger) SetLoggers(loggers ...logger.Logger) {
 	ml.loggers = loggers
 }
 
+func (ml *MuxLogger) GetLoggers() []logger.Logger {
+	return ml.loggers
+}
+
 func (ml *MuxLogger) Error(format interface{}, vars ...interface{}) {
 	for _, logger := range ml.loggers {
 		logger.Error(format, vars...)
