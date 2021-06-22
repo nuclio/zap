@@ -440,10 +440,11 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 	}
 
 	formattedVars := ""
+	delimiter := ", "
 
 	// create key=value pairs
 	for varIndex := 0; varIndex < len(vars); varIndex += 2 {
-		formattedVars += fmt.Sprintf("%s=%+v || ", vars[varIndex], vars[varIndex+1])
+		formattedVars += fmt.Sprintf(`"%s": "%+v"%s`, vars[varIndex], vars[varIndex+1], delimiter)
 	}
 
 	// if nothing was created, don't generate a group
@@ -451,6 +452,8 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 		return []interface{}{}
 	}
 
+	// let it look like a json, trim last `, `
+	formattedVars = fmt.Sprintf("{%s}", formattedVars[:len(formattedVars)-len(delimiter)])
 	return []interface{}{
 		nz.customEncoderConfig.JSON.VarGroupName,
 		formattedVars[:len(formattedVars)-4],
