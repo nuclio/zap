@@ -30,9 +30,19 @@ import (
 	"github.com/pavius/zap/zapcore"
 )
 
+type VarGroupMode string
+
+const (
+	VarGroupModeEncoded    VarGroupMode = "encoded"
+	VarGroupModeStructured VarGroupMode = "structured"
+)
+
+const DefaultVarGroupMode = VarGroupModeEncoded
+
 type EncoderConfigJSON struct {
 	LineEnding        string
 	VarGroupName      string
+	VarGroupMode      VarGroupMode
 	TimeFieldName     string
 	TimeFieldEncoding string
 }
@@ -51,6 +61,7 @@ func NewEncoderConfig() *EncoderConfig {
 			LineEnding:        ",",
 			TimeFieldName:     "time",
 			TimeFieldEncoding: "epoch-millis",
+			VarGroupMode:      DefaultVarGroupMode,
 		},
 	}
 }
@@ -209,7 +220,7 @@ func (nz *NuclioZap) ErrorCtx(ctx context.Context, format interface{}, vars ...i
 
 // ErrorWith emits error level log with arguments
 func (nz *NuclioZap) ErrorWith(format interface{}, vars ...interface{}) {
-	nz.SugaredLogger.Errorw(format.(string), vars...)
+	nz.SugaredLogger.Errorw(format.(string), nz.prepareVars(vars)...)
 }
 
 // ErrorWithCtx emits debug level log with arguments
@@ -234,7 +245,7 @@ func (nz *NuclioZap) WarnCtx(ctx context.Context, format interface{}, vars ...in
 
 // WarnWith emits warn level log with arguments
 func (nz *NuclioZap) WarnWith(format interface{}, vars ...interface{}) {
-	nz.SugaredLogger.Warnw(format.(string), vars...)
+	nz.SugaredLogger.Warnw(format.(string), nz.prepareVars(vars)...)
 }
 
 // WarnWithCtx emits debug level log with arguments
@@ -439,21 +450,45 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 		panic("Odd number of logging vars - must be key/value")
 	}
 
+	switch nz.customEncoderConfig.JSON.VarGroupMode {
+	case VarGroupModeStructured:
+		if preparedVars := nz.prepareVarsStructured(vars); len(preparedVars) != 0 {
+			return []interface{}{
+				nz.customEncoderConfig.JSON.VarGroupName,
+				preparedVars,
+			}
+		}
+	default:
+		if preparedVars := nz.prepareVarsEncoded(vars); len(preparedVars) != 0 {
+			return []interface{}{
+				nz.customEncoderConfig.JSON.VarGroupName,
+				preparedVars,
+			}
+		}
+	}
+
+	// if nothing was created, don't generate a group
+	return []interface{}{}
+}
+
+func (nz *NuclioZap) prepareVarsStructured(vars []interface{}) map[string]interface{} {
 	formattedVars := map[string]interface{}{}
 
-	// create key=value pairs
+	// create key, value pairs
 	for varIndex := 0; varIndex < len(vars); varIndex += 2 {
 		formattedVars[fmt.Sprintf("%s", vars[varIndex])] = vars[varIndex+1]
 	}
 
-	// if nothing was created, don't generate a group
-	if len(formattedVars) == 0 {
-		return []interface{}{}
+	return formattedVars
+}
+
+func (nz *NuclioZap) prepareVarsEncoded(vars []interface{}) string {
+	formattedVars := ""
+
+	// create key=value pairs
+	for varIndex := 0; varIndex < len(vars); varIndex += 2 {
+		formattedVars += fmt.Sprintf("%s=%+v || ", vars[varIndex], vars[varIndex+1])
 	}
 
-	// let it look like a json, trim last `, `
-	return []interface{}{
-		nz.customEncoderConfig.JSON.VarGroupName,
-		formattedVars,
-	}
+	return formattedVars
 }
