@@ -439,12 +439,11 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 		panic("Odd number of logging vars - must be key/value")
 	}
 
-	formattedVars := ""
-	delimiter := ", "
+	formattedVars := map[string]interface{}{}
 
 	// create key=value pairs
 	for varIndex := 0; varIndex < len(vars); varIndex += 2 {
-		formattedVars += fmt.Sprintf(`"%s": "%+v"%s`, vars[varIndex], vars[varIndex+1], delimiter)
+		formattedVars[fmt.Sprintf("%s", vars[varIndex])] = vars[varIndex+1]
 	}
 
 	// if nothing was created, don't generate a group
@@ -453,9 +452,8 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 	}
 
 	// let it look like a json, trim last `, `
-	formattedVars = fmt.Sprintf("{%s}", formattedVars[:len(formattedVars)-len(delimiter)])
 	return []interface{}{
 		nz.customEncoderConfig.JSON.VarGroupName,
-		formattedVars[:len(formattedVars)-4],
+		formattedVars,
 	}
 }
