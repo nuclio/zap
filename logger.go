@@ -305,7 +305,7 @@ func (nz *NuclioZap) DebugWithCtx(ctx context.Context, format interface{}, vars 
 
 // Flush flushes the log
 func (nz *NuclioZap) Flush() {
-	nz.Sync()
+	nz.Sync() // nolint: errcheck
 }
 
 // GetChild returned a named child logger
