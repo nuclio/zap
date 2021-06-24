@@ -33,11 +33,11 @@ import (
 type VarGroupMode string
 
 const (
-	VarGroupModeEncoded    VarGroupMode = "encoded"
+	VarGroupModeFlattened  VarGroupMode = "flattened"
 	VarGroupModeStructured VarGroupMode = "structured"
 )
 
-const DefaultVarGroupMode = VarGroupModeEncoded
+const DefaultVarGroupMode = VarGroupModeFlattened
 
 type EncoderConfigJSON struct {
 	LineEnding        string
@@ -99,6 +99,8 @@ type NuclioZap struct {
 	colorLoggerName     func(string) string
 	customEncoderConfig *EncoderConfig
 	encoding            string
+
+	prepareVarsCallback func(vars []interface{}) interface{}
 }
 
 // NewNuclioZap create a configurable logger
@@ -141,6 +143,13 @@ func NewNuclioZap(name string,
 
 	// initialize coloring by level
 	newNuclioZap.initializeColors()
+
+	switch customEncoderConfig.JSON.VarGroupMode {
+	case VarGroupModeStructured:
+		newNuclioZap.prepareVarsCallback = newNuclioZap.prepareVarsStructured
+	default:
+		newNuclioZap.prepareVarsCallback = newNuclioZap.prepareVarsFlattened
+	}
 
 	return newNuclioZap, nil
 }
@@ -445,33 +454,24 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 		return vars
 	}
 
+	if len(vars) == 0 {
+
+		// if nothing was created, don't generate a group
+		return []interface{}{}
+	}
+
 	// must be an even number of parameters
 	if len(vars)&0x1 != 0 {
 		panic("Odd number of logging vars - must be key/value")
 	}
 
-	switch nz.customEncoderConfig.JSON.VarGroupMode {
-	case VarGroupModeStructured:
-		if preparedVars := nz.prepareVarsStructured(vars); len(preparedVars) != 0 {
-			return []interface{}{
-				nz.customEncoderConfig.JSON.VarGroupName,
-				preparedVars,
-			}
-		}
-	default:
-		if preparedVars := nz.prepareVarsEncoded(vars); len(preparedVars) != 0 {
-			return []interface{}{
-				nz.customEncoderConfig.JSON.VarGroupName,
-				preparedVars,
-			}
-		}
+	return []interface{}{
+		nz.customEncoderConfig.JSON.VarGroupName,
+		nz.prepareVarsCallback(vars),
 	}
-
-	// if nothing was created, don't generate a group
-	return []interface{}{}
 }
 
-func (nz *NuclioZap) prepareVarsStructured(vars []interface{}) map[string]interface{} {
+func (nz *NuclioZap) prepareVarsStructured(vars []interface{}) interface{} {
 	formattedVars := map[string]interface{}{}
 
 	// create key, value pairs
@@ -482,7 +482,7 @@ func (nz *NuclioZap) prepareVarsStructured(vars []interface{}) map[string]interf
 	return formattedVars
 }
 
-func (nz *NuclioZap) prepareVarsEncoded(vars []interface{}) string {
+func (nz *NuclioZap) prepareVarsFlattened(vars []interface{}) interface{} {
 	formattedVars := ""
 
 	// create key=value pairs
