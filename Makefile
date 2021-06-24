@@ -14,6 +14,7 @@
 
 
 GOPATH ?= $(shell go env GOPATH)
+OS_NAME = $(shell uname)
 
 
 .PHONY: fmt
