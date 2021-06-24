@@ -27,6 +27,7 @@ jobs:
       - name: Run lint
         run: |
           make lint
+
   test:
     name: Test
     runs-on: ubuntu-latest
