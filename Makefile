@@ -13,6 +13,10 @@
 # limitations under the License.
 
 
+GOPATH ?= $(shell go env GOPATH)
+OS_NAME = $(shell uname)
+
+
 .PHONY: fmt
 fmt: ## Code formatting
 	gofmt -s -w .
@@ -43,21 +47,25 @@ lint: modules  ## Code linting
 	@echo Done.
 
 
+.PHONY: test-unit
+test-unit: modules ## Run unit tests
+	go test -v ./... -short
+
+
+## MISC
+
+
 .PHONY: modules
 modules: ensure-gopath  ## Download go module packages
 	@echo Getting go modules
 	@go mod download
+
 
 .PHONY: ensure-gopath
 ensure-gopath:  ## Ensure GOPATH env is set
 ifndef GOPATH
 	$(error GOPATH must be set)
 endif
-
-
-.PHONY: test-unit
-test-unit: ## Run unit tests
-	go test -v ./... -short
 
 .PHONY: help
 help: ## Display available commands
