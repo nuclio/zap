@@ -41,6 +41,7 @@ func (suite *BufferLoggerTestSuite) TestJSONEncodingAndStructuredVars() {
 	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
 	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName = "testVars"
 	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupMode = VarGroupModeStructured
+	bufferLogger.Logger.prepareVarsCallback = bufferLogger.Logger.prepareVarsStructured
 	suite.verifyLoggedJSONEntries(bufferLogger)
 }
 
