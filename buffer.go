@@ -27,7 +27,7 @@ import (
 
 var ErrBufferPoolAllocationTimeout = errors.New("Timed out waiting for buffer logger")
 
-// a logger who outputs the records to a buffer
+// BufferLogger is a logger who outputs the records to a buffer
 type BufferLogger struct {
 	encoding string
 	Logger   *NuclioZap
@@ -79,23 +79,21 @@ func (bl *BufferLogger) GetLogEntries() ([]map[string]interface{}, error) {
 		return nil, errors.Wrap(err, "Failed to get JSON string")
 	}
 
-	unmarshalledJSONBody := []map[string]interface{}{}
+	var unmarshalledJSONBody []map[string]interface{}
 
-	err = json.Unmarshal([]byte(jsonBody), &unmarshalledJSONBody)
-	if err != nil {
+	if err := json.Unmarshal([]byte(jsonBody), &unmarshalledJSONBody); err != nil {
 		return nil, errors.Wrap(err, "Failed to unmarshal JSON body")
 	}
 
 	return unmarshalledJSONBody, nil
 }
 
-// a pool for buffer loggers
+// BufferLoggerPool is a pool for buffer loggers
 type BufferLoggerPool struct {
 	bufferLoggerChan       chan *BufferLogger
 	defaultAllocateTimeout time.Duration
 }
 
-// a pool of buffer loggers
 func NewBufferLoggerPool(numBufferLoggers int,
 	name string,
 	encoding string,

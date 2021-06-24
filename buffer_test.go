@@ -27,42 +27,22 @@ type BufferLoggerTestSuite struct {
 	suite.Suite
 }
 
-func (suite *BufferLoggerTestSuite) TestJSONencoding() {
+func (suite *BufferLoggerTestSuite) TestJSONEncoding() {
 	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
-	// write a few entries
-	bufferLogger.Logger.Debug("Unstructured %s", "debug")
-	bufferLogger.Logger.DebugWith("Structured debug", "mode", "debug")
-	bufferLogger.Logger.Info("Unstructured %s", "info")
-	bufferLogger.Logger.InfoWith("Structured info", "mode", "info")
-	bufferLogger.Logger.Warn("Unstructured %s", "warn")
-	bufferLogger.Logger.WarnWith("Structured warn", "mode", "warn")
-	bufferLogger.Logger.Error("Unstructured %s", "error")
-	bufferLogger.Logger.ErrorWith("Structured error", "mode", "error")
+	suite.verifyLoggedJSONEntries(bufferLogger)
+}
 
-	// get log entries
-	logEntries, err := bufferLogger.GetLogEntries()
-	suite.Require().NoError(err, "Failed to get log entries")
+func (suite *BufferLoggerTestSuite) TestJSONEncodingAndStructuredVars() {
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
+	suite.Require().NoError(err, "Failed creating buffer logger")
 
-	// verify (debug should be filtered)
-	suite.Require().Equal("Unstructured info", logEntries[0]["message"])
-	suite.Require().Equal("info", logEntries[0]["level"])
-	suite.Require().Equal("Structured info", logEntries[1]["message"])
-	suite.Require().Equal("info", logEntries[1]["level"])
-	suite.Require().Equal("info", logEntries[1]["mode"])
-
-	suite.Require().Equal("Unstructured warn", logEntries[2]["message"])
-	suite.Require().Equal("warn", logEntries[2]["level"])
-	suite.Require().Equal("Structured warn", logEntries[3]["message"])
-	suite.Require().Equal("warn", logEntries[3]["level"])
-	suite.Require().Equal("warn", logEntries[3]["mode"])
-
-	suite.Require().Equal("Unstructured error", logEntries[4]["message"])
-	suite.Require().Equal("error", logEntries[4]["level"])
-	suite.Require().Equal("Structured error", logEntries[5]["message"])
-	suite.Require().Equal("error", logEntries[5]["level"])
-	suite.Require().Equal("error", logEntries[5]["mode"])
+	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
+	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName = "testVars"
+	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupMode = VarGroupModeStructured
+	bufferLogger.Logger.prepareVarsCallback = bufferLogger.Logger.prepareVarsStructured
+	suite.verifyLoggedJSONEntries(bufferLogger)
 }
 
 func (suite *BufferLoggerTestSuite) TestEmptyJSONEncoding() {
@@ -85,6 +65,65 @@ func (suite *BufferLoggerTestSuite) TestGetJSONWithNonJSONEncoding() {
 	logEntries, err := bufferLogger.GetLogEntries()
 	suite.Require().Error(err)
 	suite.Require().Nil(logEntries)
+}
+
+func (suite *BufferLoggerTestSuite) verifyLoggedJSONEntries(bufferLogger *BufferLogger) {
+
+	varsStructured := false
+	varsGroupName := ""
+	if bufferLogger.Logger.customEncoderConfig != nil &&
+		bufferLogger.Logger.customEncoderConfig.JSON.VarGroupMode == VarGroupModeStructured {
+		varsStructured = true
+		varsGroupName = bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName
+	}
+
+	// write a few entries
+	bufferLogger.Logger.Debug("Unstructured %s", "debug")
+	bufferLogger.Logger.DebugWith("Structured debug", "mode", "debug")
+	bufferLogger.Logger.Info("Unstructured %s", "info")
+	bufferLogger.Logger.InfoWith("Structured info", "mode", "info")
+	bufferLogger.Logger.Warn("Unstructured %s", "warn")
+	bufferLogger.Logger.WarnWith("Structured warn", "mode", "warn")
+	bufferLogger.Logger.Error("Unstructured %s", "error")
+	bufferLogger.Logger.ErrorWith("Structured error", "mode", "error")
+
+	// get log entries
+	logEntries, err := bufferLogger.GetLogEntries()
+	suite.Require().NoError(err, "Failed to get log entries")
+
+	// verify (debug should be filtered)
+	suite.Require().Equal("Unstructured info", logEntries[0]["message"])
+	suite.Require().Equal("info", logEntries[0]["level"])
+	suite.Require().Equal("Structured info", logEntries[1]["message"])
+	suite.Require().Equal("info", logEntries[1]["level"])
+
+	if varsStructured {
+		suite.Require().Equal(map[string]interface{}{"mode": "info"}, logEntries[1][varsGroupName])
+	} else {
+		suite.Require().Equal("info", logEntries[1]["mode"])
+
+	}
+
+	suite.Require().Equal("Unstructured warn", logEntries[2]["message"])
+	suite.Require().Equal("warn", logEntries[2]["level"])
+	suite.Require().Equal("Structured warn", logEntries[3]["message"])
+	suite.Require().Equal("warn", logEntries[3]["level"])
+
+	if varsStructured {
+		suite.Require().Equal(map[string]interface{}{"mode": "warn"}, logEntries[3][varsGroupName])
+	} else {
+		suite.Require().Equal("warn", logEntries[3]["mode"])
+	}
+
+	suite.Require().Equal("Unstructured error", logEntries[4]["message"])
+	suite.Require().Equal("error", logEntries[4]["level"])
+	suite.Require().Equal("Structured error", logEntries[5]["message"])
+	suite.Require().Equal("error", logEntries[5]["level"])
+	if varsStructured {
+		suite.Require().Equal(map[string]interface{}{"mode": "error"}, logEntries[5][varsGroupName])
+	} else {
+		suite.Require().Equal("error", logEntries[5]["mode"])
+	}
 }
 
 type BufferLoggerPoolTestSuite struct {

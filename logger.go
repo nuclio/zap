@@ -30,9 +30,19 @@ import (
 	"github.com/pavius/zap/zapcore"
 )
 
+type VarGroupMode string
+
+const (
+	VarGroupModeFlattened  VarGroupMode = "flattened"
+	VarGroupModeStructured VarGroupMode = "structured"
+)
+
+const DefaultVarGroupMode = VarGroupModeFlattened
+
 type EncoderConfigJSON struct {
 	LineEnding        string
 	VarGroupName      string
+	VarGroupMode      VarGroupMode
 	TimeFieldName     string
 	TimeFieldEncoding string
 }
@@ -51,6 +61,7 @@ func NewEncoderConfig() *EncoderConfig {
 			LineEnding:        ",",
 			TimeFieldName:     "time",
 			TimeFieldEncoding: "epoch-millis",
+			VarGroupMode:      DefaultVarGroupMode,
 		},
 	}
 }
@@ -88,6 +99,8 @@ type NuclioZap struct {
 	colorLoggerName     func(string) string
 	customEncoderConfig *EncoderConfig
 	encoding            string
+
+	prepareVarsCallback func(vars []interface{}) interface{}
 }
 
 // NewNuclioZap create a configurable logger
@@ -130,6 +143,13 @@ func NewNuclioZap(name string,
 
 	// initialize coloring by level
 	newNuclioZap.initializeColors()
+
+	switch customEncoderConfig.JSON.VarGroupMode {
+	case VarGroupModeStructured:
+		newNuclioZap.prepareVarsCallback = newNuclioZap.prepareVarsStructured
+	default:
+		newNuclioZap.prepareVarsCallback = newNuclioZap.prepareVarsFlattened
+	}
 
 	return newNuclioZap, nil
 }
@@ -209,7 +229,7 @@ func (nz *NuclioZap) ErrorCtx(ctx context.Context, format interface{}, vars ...i
 
 // ErrorWith emits error level log with arguments
 func (nz *NuclioZap) ErrorWith(format interface{}, vars ...interface{}) {
-	nz.SugaredLogger.Errorw(format.(string), vars...)
+	nz.SugaredLogger.Errorw(format.(string), nz.prepareVars(vars)...)
 }
 
 // ErrorWithCtx emits debug level log with arguments
@@ -234,7 +254,7 @@ func (nz *NuclioZap) WarnCtx(ctx context.Context, format interface{}, vars ...in
 
 // WarnWith emits warn level log with arguments
 func (nz *NuclioZap) WarnWith(format interface{}, vars ...interface{}) {
-	nz.SugaredLogger.Warnw(format.(string), vars...)
+	nz.SugaredLogger.Warnw(format.(string), nz.prepareVars(vars)...)
 }
 
 // WarnWithCtx emits debug level log with arguments
@@ -294,7 +314,7 @@ func (nz *NuclioZap) DebugWithCtx(ctx context.Context, format interface{}, vars 
 
 // Flush flushes the log
 func (nz *NuclioZap) Flush() {
-	nz.Sync()
+	nz.Sync() // nolint: errcheck
 }
 
 // GetChild returned a named child logger
@@ -434,11 +454,35 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 		return vars
 	}
 
+	if len(vars) == 0 {
+
+		// if nothing was created, don't generate a group
+		return []interface{}{}
+	}
+
 	// must be an even number of parameters
 	if len(vars)&0x1 != 0 {
 		panic("Odd number of logging vars - must be key/value")
 	}
 
+	return []interface{}{
+		nz.customEncoderConfig.JSON.VarGroupName,
+		nz.prepareVarsCallback(vars),
+	}
+}
+
+func (nz *NuclioZap) prepareVarsStructured(vars []interface{}) interface{} {
+	formattedVars := map[string]interface{}{}
+
+	// create key, value pairs
+	for varIndex := 0; varIndex < len(vars); varIndex += 2 {
+		formattedVars[fmt.Sprintf("%s", vars[varIndex])] = vars[varIndex+1]
+	}
+
+	return formattedVars
+}
+
+func (nz *NuclioZap) prepareVarsFlattened(vars []interface{}) interface{} {
 	formattedVars := ""
 
 	// create key=value pairs
@@ -446,13 +490,5 @@ func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
 		formattedVars += fmt.Sprintf("%s=%+v || ", vars[varIndex], vars[varIndex+1])
 	}
 
-	// if nothing was created, don't generate a group
-	if len(formattedVars) == 0 {
-		return []interface{}{}
-	}
-
-	return []interface{}{
-		nz.customEncoderConfig.JSON.VarGroupName,
-		formattedVars[:len(formattedVars)-4],
-	}
+	return formattedVars
 }
