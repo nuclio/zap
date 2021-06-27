@@ -323,6 +323,7 @@ func (nz *NuclioZap) GetChild(name string) logger.Logger {
 		SugaredLogger:       nz.Named(name),
 		encoding:            nz.encoding,
 		customEncoderConfig: nz.customEncoderConfig,
+		prepareVarsCallback: nz.prepareVarsCallback,
 	}
 }
 
@@ -483,12 +484,13 @@ func (nz *NuclioZap) prepareVarsStructured(vars []interface{}) interface{} {
 }
 
 func (nz *NuclioZap) prepareVarsFlattened(vars []interface{}) interface{} {
-	formattedVars := ""
+	var s strings.Builder
+	delimiter := " || "
 
 	// create key=value pairs
 	for varIndex := 0; varIndex < len(vars); varIndex += 2 {
-		formattedVars += fmt.Sprintf("%s=%+v || ", vars[varIndex], vars[varIndex+1])
+		s.WriteString(fmt.Sprintf("%s=%+v%s", vars[varIndex], vars[varIndex+1], delimiter))
 	}
 
-	return formattedVars
+	return s.String()[:s.Len()-len(delimiter)]
 }
