@@ -27,6 +27,34 @@ type BufferLoggerTestSuite struct {
 	suite.Suite
 }
 
+func (suite *BufferLoggerTestSuite) TestRedactor() {
+	redactor := NewRedactor(nil)
+	redactor.AddValueRedactions([]string{"password"})
+	redactor.AddRedactions([]string{"replaceme"})
+	bufferLogger, err := NewRedactedBufferLogger("test", "json", InfoLevel, redactor)
+	suite.Require().NoError(err, "Failed creating buffer logger")
+
+	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
+	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName = "testVars"
+	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupMode = VarGroupModeStructured
+	bufferLogger.Logger.prepareVarsCallback = bufferLogger.Logger.prepareVarsStructured
+
+	// log
+	bufferLogger.Logger.InfoWith("Check", "password", "123456", "replaceme", "55")
+
+	// get log entries
+	logEntries, err := bufferLogger.GetLogEntries()
+	suite.Require().NoError(err, "Failed to get log entries")
+
+	// verify (debug should be filtered)
+	suite.Require().Equal("Check", logEntries[0]["message"])
+	suite.Require().Equal("info", logEntries[0]["level"])
+	suite.Require().Equal(map[string]interface{}{
+		"*****":    "55",
+		"password": "[redacted]",
+	}, logEntries[0][bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName])
+}
+
 func (suite *BufferLoggerTestSuite) TestJSONEncoding() {
 	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
 	suite.Require().NoError(err, "Failed creating buffer logger")
