@@ -17,10 +17,10 @@ limitations under the License.
 package nucliozap
 
 import (
-	"github.com/nuclio/logger"
 	"testing"
 	"time"
 
+	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/suite"
 )
 
