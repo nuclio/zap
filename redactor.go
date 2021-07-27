@@ -14,10 +14,10 @@ limitations under the License.
 package nucliozap
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"regexp"
-	"strings"
 )
 
 type RedactingLogger interface {
@@ -28,19 +28,21 @@ type RedactingLogger interface {
 type Redactor struct {
 	disabled               bool
 	output                 io.Writer
-	redactions             []string
-	valueRedactions        []string
-	replacementString      string
-	valueReplacementString string
+	redactions             [][]byte
+	valueRedactions        [][]byte
+	valueRedactionsRegexps []regexp.Regexp
+	replacement            []byte
+	valueReplacement       []byte
 }
 
 func NewRedactor(output io.Writer) *Redactor {
 	return &Redactor{
 		output:                 output,
-		redactions:             []string{},
-		valueRedactions:        []string{},
-		replacementString:      "*****",
-		valueReplacementString: `"[redacted]"`,
+		redactions:             [][]byte{},
+		valueRedactions:        [][]byte{},
+		valueRedactionsRegexps: []regexp.Regexp{},
+		replacement:            []byte("*****"),
+		valueReplacement:       []byte(`$1"[redacted]"`),
 		disabled:               false,
 	}
 }
@@ -49,13 +51,20 @@ func (r *Redactor) GetOutput() io.Writer {
 	return r.output
 }
 
-func (r *Redactor) AddValueRedactions(valueRedactions []string) {
-	r.valueRedactions = append(r.valueRedactions, valueRedactions...)
-	r.valueRedactions = r.removeDuplicates(r.valueRedactions)
+func (r *Redactor) GetRedactions() [][]byte {
+	return r.redactions
 }
 
-func (r *Redactor) GetRedactions() []string {
-	return r.redactions
+func (r *Redactor) SetDisabled(disable bool) {
+	r.disabled = disable
+}
+
+func (r *Redactor) AddValueRedactions(valueRedactions []string) {
+	for _, valueRedaction := range valueRedactions {
+		r.valueRedactions = append(r.valueRedactions, []byte(valueRedaction))
+	}
+	r.valueRedactions = r.removeDuplicates(r.valueRedactions)
+	r.prepareReplacements()
 }
 
 func (r *Redactor) AddRedactions(redactions []string) {
@@ -67,13 +76,15 @@ func (r *Redactor) AddRedactions(redactions []string) {
 		}
 	}
 
-	r.redactions = append(r.redactions, nonEmptyRedactions...)
+	for _, nonEmptyRedaction := range nonEmptyRedactions {
+		r.redactions = append(r.redactions, []byte(nonEmptyRedaction))
+	}
 	r.redactions = r.removeDuplicates(r.redactions)
 }
 
 func (r *Redactor) Write(p []byte) (n int, err error) {
-	redactedPrint := r.redact(string(p))
-	n, err = r.output.Write([]byte(redactedPrint))
+	redactedPrint := r.redact(p)
+	n, err = r.output.Write(redactedPrint)
 	if err != nil {
 		return
 	}
@@ -95,45 +106,54 @@ func (r *Redactor) Disable() {
 	r.disabled = true
 }
 
-func (r *Redactor) redact(input string) string {
+func (r *Redactor) prepareReplacements() {
+
+	// redact values of either strings of type `valueRedaction=[value]` or `valueRedaction: [value]`
+	// w/wo single/double quotes
+	// golang regex doesn't support lookarounds, so we will check things manually
+	matchKeyWithSeparatorTemplate := `\\*[\'"]?(?i)%s\\*[\'"]?\s*[=:]\s*`
+	matchValue := `\'[^\']*?\'|\"[^\"]*\"|\S*`
+
+	for _, redactionField := range r.valueRedactions {
+		matchKeyWithSeparator := fmt.Sprintf(matchKeyWithSeparatorTemplate, redactionField)
+		r.valueRedactionsRegexps = append(r.valueRedactionsRegexps,
+			*regexp.MustCompile(fmt.Sprintf(`(%s)(%s)`, matchKeyWithSeparator, matchValue)),
+		)
+	}
+
+}
+
+func (r *Redactor) redact(input []byte) []byte {
 	if r.disabled {
 		return input
 	}
 
 	redacted := input
 
-	// golang regex doesn't support lookarounds, so we will check things manually
-	matchKeyWithSeparatorTemplate := `\\*[\'"]?(?i)%s\\*[\'"]?\s*[=:]\s*`
-	matchValue := `\'[^\']*?\'|\"[^\"]*\"|\S*`
-
-	// redact values of either strings of type `valueRedaction=[value]` or `valueRedaction: [value]`
-	// w/wo single/double quotes
-	for _, redactionField := range r.valueRedactions {
-		matchKeyWithSeparator := fmt.Sprintf(matchKeyWithSeparatorTemplate, redactionField)
-		re := regexp.MustCompile(fmt.Sprintf(`(%s)(%s)`, matchKeyWithSeparator, matchValue))
-		redacted = re.ReplaceAllString(redacted, fmt.Sprintf(`$1%s`, r.valueReplacementString))
+	for _, valueRedactionsRegexp := range r.valueRedactionsRegexps {
+		redacted = valueRedactionsRegexp.ReplaceAll(redacted, r.valueReplacement)
 	}
 
 	// replace the simple string redactions
 	for _, redactionField := range r.redactions {
-		redacted = strings.ReplaceAll(redacted, redactionField, r.replacementString)
+		redacted = bytes.ReplaceAll(redacted, redactionField, r.replacement)
 	}
 
 	return redacted
 }
 
-func (r *Redactor) removeDuplicates(elements []string) []string {
+func (r *Redactor) removeDuplicates(elements [][]byte) [][]byte {
 	encountered := map[string]bool{}
 
 	// Create a map of all unique elements.
 	for v := range elements {
-		encountered[elements[v]] = true
+		encountered[string(elements[v])] = true
 	}
 
 	// Place all keys from the map into a slice.
-	var result []string
+	var result [][]byte
 	for key := range encountered {
-		result = append(result, key)
+		result = append(result, []byte(key))
 	}
 	return result
 }

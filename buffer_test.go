@@ -17,6 +17,7 @@ limitations under the License.
 package nucliozap
 
 import (
+	"github.com/nuclio/logger"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ func (suite *BufferLoggerTestSuite) TestRedactor() {
 	redactor := NewRedactor(nil)
 	redactor.AddValueRedactions([]string{"password"})
 	redactor.AddRedactions([]string{"replaceme"})
-	bufferLogger, err := NewRedactedBufferLogger("test", "json", InfoLevel, redactor)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, redactor)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
@@ -56,14 +57,14 @@ func (suite *BufferLoggerTestSuite) TestRedactor() {
 }
 
 func (suite *BufferLoggerTestSuite) TestJSONEncoding() {
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, nil)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	suite.verifyLoggedJSONEntries(bufferLogger)
 }
 
 func (suite *BufferLoggerTestSuite) TestJSONEncodingAndStructuredVars() {
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, nil)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
@@ -74,7 +75,7 @@ func (suite *BufferLoggerTestSuite) TestJSONEncodingAndStructuredVars() {
 }
 
 func (suite *BufferLoggerTestSuite) TestEmptyJSONEncoding() {
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, nil)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	// get log entries
@@ -86,7 +87,7 @@ func (suite *BufferLoggerTestSuite) TestEmptyJSONEncoding() {
 }
 
 func (suite *BufferLoggerTestSuite) TestGetJSONWithNonJSONEncoding() {
-	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel)
+	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel, nil)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	// get log entries
@@ -197,6 +198,36 @@ func (suite *BufferLoggerPoolTestSuite) TestAllocation() {
 
 	// allocated logger should be zero'd out
 	suite.Require().Equal(0, bufferLogger.Buffer.Len())
+}
+
+// ============
+// Benchmarking
+// ============
+
+func BenchmarkNewBufferLogger(b *testing.B) {
+	loggerInstance := createLogger(b, nil)
+	for i := 0; i < b.N; i++ {
+		loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
+	}
+}
+
+func BenchmarkNewBufferLoggerRedacted(b *testing.B) {
+	redactor := NewRedactor(nil)
+	redactor.AddValueRedactions([]string{"password"})
+	redactor.AddRedactions([]string{"replaceme"})
+	loggerInstance := createLogger(b, redactor)
+	for i := 0; i < b.N; i++ {
+		loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
+	}
+}
+
+func createLogger(b *testing.B, redactor *Redactor) logger.Logger {
+	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel, redactor)
+	if err != nil {
+		b.FailNow()
+		return nil
+	}
+	return bufferLogger.Logger
 }
 
 func TestBufferLoggerTestSuite(t *testing.T) {

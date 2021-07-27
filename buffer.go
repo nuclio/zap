@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,42 +35,22 @@ type BufferLogger struct {
 	Buffer   *bytes.Buffer
 }
 
-func NewRedactedBufferLogger(name string, encoding string, level Level, redactor *Redactor) (*BufferLogger, error) {
+func NewBufferLogger(name string, encoding string, level Level, redactor *Redactor) (*BufferLogger, error) {
 	writer := &bytes.Buffer{}
-	redactor.output = writer
-
-	// create a logger that is able to capture the output into a buffer. if a request arrives
-	// and the user wishes to capture the log, this will be used as the logger instead of the default
-	// logger
-	newLogger, err := NewNuclioZap(name,
-		encoding,
-		nil,
-		redactor,
-		redactor,
-		level)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create buffer logger")
+	var output io.Writer = writer
+	if redactor != nil {
+		redactor.output = writer
+		output = redactor
 	}
 
-	return &BufferLogger{
-		Logger:   newLogger,
-		encoding: encoding,
-		Buffer:   writer,
-	}, nil
-}
-
-func NewBufferLogger(name string, encoding string, level Level) (*BufferLogger, error) {
-	writer := &bytes.Buffer{}
-
 	// create a logger that is able to capture the output into a buffer. if a request arrives
 	// and the user wishes to capture the log, this will be used as the logger instead of the default
 	// logger
 	newLogger, err := NewNuclioZap(name,
 		encoding,
 		nil,
-		writer,
-		writer,
+		output,
+		output,
 		level)
 
 	if err != nil {
@@ -129,7 +110,7 @@ func NewBufferLoggerPool(numBufferLoggers int,
 
 	// create buffer loggers
 	for bufferLoggerIdx := 0; bufferLoggerIdx < numBufferLoggers; bufferLoggerIdx++ {
-		newBufferLogger, err := NewBufferLogger(name, encoding, level)
+		newBufferLogger, err := NewBufferLogger(name, encoding, level, nil)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create buffer logger")
 		}

@@ -35,7 +35,7 @@ func (suite *MuxLoggerTestSuite) SetupTest() {
 
 	// create a few loggers so that we can use them
 	for bufferIdx := 0; bufferIdx < 3; bufferIdx++ {
-		bufferLogger, err := NewBufferLogger("bl", "json", InfoLevel)
+		bufferLogger, err := NewBufferLogger("bl", "json", InfoLevel, nil)
 		suite.Require().NoError(err)
 
 		suite.bufferLoggers = append(suite.bufferLoggers, bufferLogger)

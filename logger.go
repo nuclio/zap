@@ -174,12 +174,24 @@ func NewNuclioZapTest(name string) (*NuclioZap, error) {
 		loggerLevel = InfoLevel
 	}
 
-	return NewNuclioZapCmd(name, loggerLevel)
+	return NewNuclioZapCmd(name, loggerLevel, nil)
 }
 
 // NewNuclioZapCmd creates a logger pre-configured for commands
-func NewNuclioZapCmd(name string, level Level) (*NuclioZap, error) {
-	return NewNuclioZap(name, "console", nil, os.Stdout, os.Stdout, level)
+func NewNuclioZapCmd(name string, level Level, redactor *Redactor) (*NuclioZap, error) {
+	var writer io.Writer = os.Stdout
+
+	// if redactor is given, use it
+	if redactor != nil {
+
+		// fill out redactor output sink
+		if redactor.output == nil {
+			redactor.output = writer
+		}
+
+		writer = redactor
+	}
+	return NewNuclioZap(name, "console", nil, writer, writer, level)
 }
 
 // GetLevelByName return logging level by name
