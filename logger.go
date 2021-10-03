@@ -178,15 +178,15 @@ func NewNuclioZapTest(name string) (*NuclioZap, error) {
 }
 
 // NewNuclioZapCmd creates a logger pre-configured for commands
-func NewNuclioZapCmd(name string, level Level, redactor *Redactor) (*NuclioZap, error) {
+func NewNuclioZapCmd(name string, level Level, redactor RedactingLogger) (*NuclioZap, error) {
 	var writer io.Writer = os.Stdout
 
-	// if redactor is given, use it
+	// if redactor is given, use its writer
 	if redactor != nil {
 
 		// fill out redactor output sink
-		if redactor.output == nil {
-			redactor.output = writer
+		if redactor.GetOutput() == nil {
+			redactor.SetOutput(writer)
 		}
 
 		writer = redactor

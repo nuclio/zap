@@ -17,6 +17,7 @@ limitations under the License.
 package nucliozap
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -165,7 +166,7 @@ func (suite *BufferLoggerPoolTestSuite) TestAllocation() {
 	level := DebugLevel
 	timeout := 1 * time.Second
 
-	bufferLoggerPool, err := NewBufferLoggerPool(2, name, encoding, level)
+	bufferLoggerPool, err := NewBufferLoggerPool(2, name, encoding, level, nil)
 	suite.Require().NoError(err, "Failed creating buffer logger pool")
 
 	// allocate first
@@ -206,28 +207,48 @@ func (suite *BufferLoggerPoolTestSuite) TestAllocation() {
 
 func BenchmarkNewBufferLogger(b *testing.B) {
 	loggerInstance := createLogger(b, nil)
-	for i := 0; i < b.N; i++ {
-		loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
-	}
+	executeBenchmark(b, loggerInstance)
 }
 
-func BenchmarkNewBufferLoggerRedacted(b *testing.B) {
-	redactor := NewRedactor(nil)
-	redactor.AddValueRedactions([]string{"password"})
+func BenchmarkNewBufferLoggerWithRedactor(b *testing.B) {
+	loggerInstance := createLogger(b, NewRedactor(&bytes.Buffer{}))
+	executeBenchmark(b, loggerInstance)
+}
+
+func BenchmarkNewBufferLoggerWithDisabledRedactor(b *testing.B) {
+	redactor := NewRedactor(&bytes.Buffer{})
+	redactor.SetDisabled(true)
+	loggerInstance := createLogger(b, redactor)
+	executeBenchmark(b, loggerInstance)
+}
+
+func BenchmarkNewBufferLoggerWithRedactorWithRedactions(b *testing.B) {
+	redactor := NewRedactor(&bytes.Buffer{})
 	redactor.AddRedactions([]string{"replaceme"})
 	loggerInstance := createLogger(b, redactor)
-	for i := 0; i < b.N; i++ {
-		loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
-	}
+	executeBenchmark(b, loggerInstance)
 }
 
-func createLogger(b *testing.B, redactor *Redactor) logger.Logger {
+func BenchmarkNewBufferLoggerWithRedactorWithValueRedactions(b *testing.B) {
+	redactor := NewRedactor(&bytes.Buffer{})
+	redactor.AddValueRedactions([]string{"replaceme"})
+	loggerInstance := createLogger(b, redactor)
+	executeBenchmark(b, loggerInstance)
+}
+
+func createLogger(b *testing.B, redactor RedactingLogger) logger.Logger {
 	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel, redactor)
 	if err != nil {
 		b.FailNow()
 		return nil
 	}
 	return bufferLogger.Logger
+}
+
+func executeBenchmark(b *testing.B, loggerInstance logger.Logger) {
+	for i := 0; i < b.N; i++ {
+		loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
+	}
 }
 
 func TestBufferLoggerTestSuite(t *testing.T) {

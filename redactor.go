@@ -21,8 +21,24 @@ import (
 )
 
 type RedactingLogger interface {
-	GetRedactor() *Redactor
+
+	// SetOutput sets redactor output
+	SetOutput(io.Writer)
+
+	// GetOutput returns redactor writer
 	GetOutput() io.Writer
+
+	// Write writes to output
+	Write(p []byte) (n int, err error)
+
+	// AddRedactions redacts simple strings
+	AddRedactions(redactions []string)
+
+	// AddValueRedactions redacts key:[value] or key=[value] kind of strings
+	AddValueRedactions(valueRedactions []string)
+
+	// SetDisabled turns logger redaction on/off
+	SetDisabled(disable bool)
 }
 
 type Redactor struct {
@@ -33,10 +49,13 @@ type Redactor struct {
 	valueRedactionsRegexps []regexp.Regexp
 	replacement            []byte
 	valueReplacement       []byte
+
+	// must have same signature as io.Writer Write
+	redactFunc func(p []byte) (n int, err error)
 }
 
 func NewRedactor(output io.Writer) *Redactor {
-	return &Redactor{
+	redactor := &Redactor{
 		output:                 output,
 		redactions:             [][]byte{},
 		valueRedactions:        [][]byte{},
@@ -45,6 +64,12 @@ func NewRedactor(output io.Writer) *Redactor {
 		valueReplacement:       []byte(`$1"[redacted]"`),
 		disabled:               false,
 	}
+	redactor.redactFunc = redactor.redactEnabled
+	return redactor
+}
+
+func (r *Redactor) SetOutput(output io.Writer) {
+	r.output = output
 }
 
 func (r *Redactor) GetOutput() io.Writer {
@@ -57,6 +82,11 @@ func (r *Redactor) GetRedactions() [][]byte {
 
 func (r *Redactor) SetDisabled(disable bool) {
 	r.disabled = disable
+	if disable {
+		r.redactFunc = r.redactDisabled
+	} else {
+		r.redactFunc = r.redactEnabled
+	}
 }
 
 func (r *Redactor) AddValueRedactions(valueRedactions []string) {
@@ -83,19 +113,7 @@ func (r *Redactor) AddRedactions(redactions []string) {
 }
 
 func (r *Redactor) Write(p []byte) (n int, err error) {
-	redactedPrint := r.redact(p)
-	n, err = r.output.Write(redactedPrint)
-	if err != nil {
-		return
-	}
-	if n != len(redactedPrint) {
-		err = io.ErrShortWrite
-		return
-	}
-
-	// HACK: let the caller know we wrote the original length of the text
-	// To prevent caller explode while validating the length of the written text (redaction might change the length)
-	return len(p), err
+	return r.redactFunc(p)
 }
 
 func (r *Redactor) Enable() {
@@ -123,23 +141,39 @@ func (r *Redactor) prepareReplacements() {
 
 }
 
-func (r *Redactor) redact(input []byte) []byte {
-	if r.disabled {
-		return input
+func (r *Redactor) redactDisabled(p []byte) (n int, err error) {
+	return r.output.Write(p)
+}
+
+func (r *Redactor) redactEnabled(p []byte) (n int, err error) {
+	redactedPrint := r.redact(p)
+	n, err = r.output.Write(redactedPrint)
+	if err != nil {
+		return
+	}
+	if n != len(redactedPrint) {
+		err = io.ErrShortWrite
+		return
 	}
 
-	redacted := input
+	// HACK: let the caller know we wrote the original length of the text
+	// To prevent caller explode while validating the length of the written text (redaction might change the length)
+	return len(p), err
+}
 
+func (r *Redactor) redact(inputToRedact []byte) []byte {
+
+	// replace key=value or key: value
 	for _, valueRedactionsRegexp := range r.valueRedactionsRegexps {
-		redacted = valueRedactionsRegexp.ReplaceAll(redacted, r.valueReplacement)
+		inputToRedact = valueRedactionsRegexp.ReplaceAll(inputToRedact, r.valueReplacement)
 	}
 
 	// replace the simple string redactions
 	for _, redactionField := range r.redactions {
-		redacted = bytes.ReplaceAll(redacted, redactionField, r.replacement)
+		inputToRedact = bytes.ReplaceAll(inputToRedact, redactionField, r.replacement)
 	}
 
-	return redacted
+	return inputToRedact
 }
 
 func (r *Redactor) removeDuplicates(elements [][]byte) [][]byte {

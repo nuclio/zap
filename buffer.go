@@ -35,11 +35,11 @@ type BufferLogger struct {
 	Buffer   *bytes.Buffer
 }
 
-func NewBufferLogger(name string, encoding string, level Level, redactor *Redactor) (*BufferLogger, error) {
+func NewBufferLogger(name string, encoding string, level Level, redactor RedactingLogger) (*BufferLogger, error) {
 	writer := &bytes.Buffer{}
 	var output io.Writer = writer
 	if redactor != nil {
-		redactor.output = writer
+		redactor.SetOutput(writer)
 		output = redactor
 	}
 
@@ -103,14 +103,15 @@ type BufferLoggerPool struct {
 func NewBufferLoggerPool(numBufferLoggers int,
 	name string,
 	encoding string,
-	level Level) (*BufferLoggerPool, error) {
+	level Level,
+	redactor RedactingLogger) (*BufferLoggerPool, error) {
 
 	// create a channel for the buffer loggers
 	bufferLoggersChan := make(chan *BufferLogger, numBufferLoggers)
 
 	// create buffer loggers
 	for bufferLoggerIdx := 0; bufferLoggerIdx < numBufferLoggers; bufferLoggerIdx++ {
-		newBufferLogger, err := NewBufferLogger(name, encoding, level, nil)
+		newBufferLogger, err := NewBufferLogger(name, encoding, level, redactor)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create buffer logger")
 		}
