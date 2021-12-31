@@ -39,7 +39,9 @@ const (
 
 const DefaultVarGroupMode = VarGroupModeFlattened
 
-const DefaultContextIDKey = "requestID"
+type ContextIDKey string
+
+const DefaultContextIDKey ContextIDKey = "requestID"
 
 type EncoderConfigJSON struct {
 	LineEnding        string
@@ -66,7 +68,7 @@ func NewEncoderConfig() *EncoderConfig {
 			TimeFieldEncoding: "epoch-millis",
 			VarGroupMode:      DefaultVarGroupMode,
 		},
-		ContextIDKey: DefaultContextIDKey,
+		ContextIDKey: string(DefaultContextIDKey),
 	}
 }
 
@@ -156,7 +158,7 @@ func NewNuclioZap(name string,
 	}
 
 	if customEncoderConfig.ContextIDKey == "" {
-		customEncoderConfig.ContextIDKey = DefaultContextIDKey
+		customEncoderConfig.ContextIDKey = string(DefaultContextIDKey)
 	}
 	return newNuclioZap, nil
 }
