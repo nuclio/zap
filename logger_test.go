@@ -19,7 +19,7 @@ func (suite *LoggerTestSuite) TestContextRequestID() {
 	zap, err := NewNuclioZap("test", "json", encoderConfig, writer, writer, DebugLevel)
 	suite.Require().NoError(err)
 	requestIDValue := "some-random-request-id"
-	ctx := context.WithValue(context.TODO(), ContextIDKey(encoderConfig.ContextIDKey), requestIDValue)
+	ctx := context.WithValue(context.TODO(), encoderConfig.ContextIDKey, requestIDValue)
 	zap.DebugWithCtx(ctx, "Gimme my cookie")
 	suite.Require().Contains(writer.String(),
 		fmt.Sprintf(`"%s":"%s"`, encoderConfig.ContextIDKey, requestIDValue))

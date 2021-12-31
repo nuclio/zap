@@ -57,7 +57,7 @@ type EncoderConfigConsole struct {
 type EncoderConfig struct {
 	JSON         EncoderConfigJSON
 	Console      EncoderConfigConsole
-	ContextIDKey string
+	ContextIDKey ContextIDKey
 }
 
 func NewEncoderConfig() *EncoderConfig {
@@ -68,7 +68,7 @@ func NewEncoderConfig() *EncoderConfig {
 			TimeFieldEncoding: "epoch-millis",
 			VarGroupMode:      DefaultVarGroupMode,
 		},
-		ContextIDKey: string(DefaultContextIDKey),
+		ContextIDKey: DefaultContextIDKey,
 	}
 }
 
@@ -158,7 +158,7 @@ func NewNuclioZap(name string,
 	}
 
 	if customEncoderConfig.ContextIDKey == "" {
-		customEncoderConfig.ContextIDKey = string(DefaultContextIDKey)
+		customEncoderConfig.ContextIDKey = DefaultContextIDKey
 	}
 	return newNuclioZap, nil
 }
@@ -438,7 +438,7 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 
 	// create a slice 2 slots larger
 	varsWithContext := make([]interface{}, 0, len(vars)+2)
-	varsWithContext = append(varsWithContext, nz.customEncoderConfig.ContextIDKey)
+	varsWithContext = append(varsWithContext, string(nz.customEncoderConfig.ContextIDKey))
 	varsWithContext = append(varsWithContext, requestID)
 	varsWithContext = append(varsWithContext, vars...)
 
