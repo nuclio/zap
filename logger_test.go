@@ -2,6 +2,8 @@ package nucliozap
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -9,6 +11,18 @@ import (
 
 type LoggerTestSuite struct {
 	suite.Suite
+}
+
+func (suite *LoggerTestSuite) TestContextRequestID() {
+	writer := &bytes.Buffer{}
+	encoderConfig := NewEncoderConfig()
+	zap, err := NewNuclioZap("test", "json", encoderConfig, writer, writer, DebugLevel)
+	suite.Require().NoError(err)
+	requestIDValue := "some-random-request-id"
+	ctx := context.WithValue(context.TODO(), encoderConfig.ContextIDKey, requestIDValue)
+	zap.DebugWithCtx(ctx, "Gimme my cookie")
+	suite.Require().Contains(writer.String(),
+		fmt.Sprintf(`"%s":"%s"`, encoderConfig.ContextIDKey, requestIDValue))
 }
 
 func (suite *LoggerTestSuite) TestPrepareVars() {

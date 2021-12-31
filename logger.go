@@ -39,6 +39,8 @@ const (
 
 const DefaultVarGroupMode = VarGroupModeFlattened
 
+const DefaultContextIDKey = "requestID"
+
 type EncoderConfigJSON struct {
 	LineEnding        string
 	VarGroupName      string
@@ -51,8 +53,9 @@ type EncoderConfigConsole struct {
 }
 
 type EncoderConfig struct {
-	JSON    EncoderConfigJSON
-	Console EncoderConfigConsole
+	JSON         EncoderConfigJSON
+	Console      EncoderConfigConsole
+	ContextIDKey string
 }
 
 func NewEncoderConfig() *EncoderConfig {
@@ -63,6 +66,7 @@ func NewEncoderConfig() *EncoderConfig {
 			TimeFieldEncoding: "epoch-millis",
 			VarGroupMode:      DefaultVarGroupMode,
 		},
+		ContextIDKey: DefaultContextIDKey,
 	}
 }
 
@@ -151,6 +155,9 @@ func NewNuclioZap(name string,
 		newNuclioZap.prepareVarsCallback = newNuclioZap.prepareVarsFlattened
 	}
 
+	if customEncoderConfig.ContextIDKey == "" {
+		customEncoderConfig.ContextIDKey = DefaultContextIDKey
+	}
 	return newNuclioZap, nil
 }
 
@@ -420,7 +427,7 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 	}
 
 	// get request ID from context
-	requestID := ctx.Value("RequestID")
+	requestID := ctx.Value(nz.customEncoderConfig.ContextIDKey)
 
 	// if not set, don't add it to vars
 	if requestID == nil || requestID == "" {
@@ -429,7 +436,7 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 
 	// create a slice 2 slots larger
 	varsWithContext := make([]interface{}, 0, len(vars)+2)
-	varsWithContext = append(varsWithContext, "requestID")
+	varsWithContext = append(varsWithContext, nz.customEncoderConfig.ContextIDKey)
 	varsWithContext = append(varsWithContext, requestID)
 	varsWithContext = append(varsWithContext, vars...)
 
@@ -440,14 +447,14 @@ func (nz *NuclioZap) getFormatWithContext(ctx context.Context, format interface{
 	formatString := format.(string)
 
 	// get request ID from context
-	requestID := ctx.Value("RequestID")
+	requestID := ctx.Value(nz.customEncoderConfig.ContextIDKey)
 
 	// if not set, don't add it to vars
 	if requestID == nil || requestID == "" {
 		return formatString
 	}
 
-	return formatString + fmt.Sprintf(" (requestID: %s)", requestID)
+	return formatString + fmt.Sprintf(" (%s: %s)", nz.customEncoderConfig.ContextIDKey, requestID)
 }
 
 func (nz *NuclioZap) prepareVars(vars []interface{}) []interface{} {
