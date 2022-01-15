@@ -23,7 +23,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/nuclio/errors"
 )
 
 var ErrBufferPoolAllocationTimeout = errors.New("Timed out waiting for buffer logger")
@@ -35,31 +35,36 @@ type BufferLogger struct {
 	Buffer   *bytes.Buffer
 }
 
-func NewBufferLogger(name string, encoding string, level Level, redactor RedactingLogger) (*BufferLogger, error) {
+// NewBufferLogger creates a logger that is able to capture the output into a buffer. if a request arrives
+// and the user wishes to capture the log, this will be used as the logger instead of the default
+// logger
+func NewBufferLogger(name string, encoding string, level Level) (*BufferLogger, error) {
 	writer := &bytes.Buffer{}
-	var output io.Writer = writer
-	if redactor != nil {
-		redactor.SetOutput(writer)
-		output = redactor
-	}
+	return newBufferLogger(name, encoding, level, writer, writer)
+}
 
-	// create a logger that is able to capture the output into a buffer. if a request arrives
-	// and the user wishes to capture the log, this will be used as the logger instead of the default
-	// logger
+func NewBufferLoggerWithRedactor(name string, encoding string, level Level, redactor *Redactor) (*BufferLogger, error) {
+	return newBufferLogger(name, encoding, level, redactor, redactor.GetOutput().(*bytes.Buffer))
+}
+
+func newBufferLogger(name string,
+	encoding string,
+	level Level,
+	writer io.Writer,
+	buffer *bytes.Buffer) (*BufferLogger, error) {
 	newLogger, err := NewNuclioZap(name,
 		encoding,
 		nil,
-		output,
-		output,
+		writer,
+		writer,
 		level)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create buffer logger")
 	}
 
 	return &BufferLogger{
 		Logger:   newLogger,
-		Buffer:   writer,
+		Buffer:   buffer,
 		encoding: encoding,
 	}, nil
 }
@@ -103,15 +108,14 @@ type BufferLoggerPool struct {
 func NewBufferLoggerPool(numBufferLoggers int,
 	name string,
 	encoding string,
-	level Level,
-	redactor RedactingLogger) (*BufferLoggerPool, error) {
+	level Level) (*BufferLoggerPool, error) {
 
 	// create a channel for the buffer loggers
 	bufferLoggersChan := make(chan *BufferLogger, numBufferLoggers)
 
 	// create buffer loggers
 	for bufferLoggerIdx := 0; bufferLoggerIdx < numBufferLoggers; bufferLoggerIdx++ {
-		newBufferLogger, err := NewBufferLogger(name, encoding, level, redactor)
+		newBufferLogger, err := NewBufferLogger(name, encoding, level)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create buffer logger")
 		}

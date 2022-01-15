@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -30,10 +29,10 @@ type BufferLoggerTestSuite struct {
 }
 
 func (suite *BufferLoggerTestSuite) TestRedactor() {
-	redactor := NewRedactor(nil)
+	redactor := NewRedactor(&bytes.Buffer{})
 	redactor.AddValueRedactions([]string{"password"})
 	redactor.AddRedactions([]string{"replaceme"})
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, redactor)
+	bufferLogger, err := NewBufferLoggerWithRedactor("test", "json", InfoLevel, redactor)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
@@ -58,14 +57,14 @@ func (suite *BufferLoggerTestSuite) TestRedactor() {
 }
 
 func (suite *BufferLoggerTestSuite) TestJSONEncoding() {
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, nil)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	suite.verifyLoggedJSONEntries(bufferLogger)
 }
 
 func (suite *BufferLoggerTestSuite) TestJSONEncodingAndStructuredVars() {
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, nil)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
@@ -76,7 +75,7 @@ func (suite *BufferLoggerTestSuite) TestJSONEncodingAndStructuredVars() {
 }
 
 func (suite *BufferLoggerTestSuite) TestEmptyJSONEncoding() {
-	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel, nil)
+	bufferLogger, err := NewBufferLogger("test", "json", InfoLevel)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	// get log entries
@@ -88,7 +87,7 @@ func (suite *BufferLoggerTestSuite) TestEmptyJSONEncoding() {
 }
 
 func (suite *BufferLoggerTestSuite) TestGetJSONWithNonJSONEncoding() {
-	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel, nil)
+	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	// get log entries
@@ -166,7 +165,7 @@ func (suite *BufferLoggerPoolTestSuite) TestAllocation() {
 	level := DebugLevel
 	timeout := 1 * time.Second
 
-	bufferLoggerPool, err := NewBufferLoggerPool(2, name, encoding, level, nil)
+	bufferLoggerPool, err := NewBufferLoggerPool(2, name, encoding, level)
 	suite.Require().NoError(err, "Failed creating buffer logger pool")
 
 	// allocate first
@@ -206,48 +205,54 @@ func (suite *BufferLoggerPoolTestSuite) TestAllocation() {
 // ============
 
 func BenchmarkNewBufferLogger(b *testing.B) {
-	loggerInstance := createLogger(b, nil)
+	loggerInstance := createBufferLogger(b, nil)
 	executeBenchmark(b, loggerInstance)
 }
 
 func BenchmarkNewBufferLoggerWithRedactor(b *testing.B) {
-	loggerInstance := createLogger(b, NewRedactor(&bytes.Buffer{}))
+	loggerInstance := createBufferLogger(b, NewRedactor(&bytes.Buffer{}))
 	executeBenchmark(b, loggerInstance)
 }
 
 func BenchmarkNewBufferLoggerWithDisabledRedactor(b *testing.B) {
 	redactor := NewRedactor(&bytes.Buffer{})
 	redactor.SetDisabled(true)
-	loggerInstance := createLogger(b, redactor)
+	loggerInstance := createBufferLogger(b, redactor)
 	executeBenchmark(b, loggerInstance)
 }
 
 func BenchmarkNewBufferLoggerWithRedactorWithRedactions(b *testing.B) {
 	redactor := NewRedactor(&bytes.Buffer{})
 	redactor.AddRedactions([]string{"replaceme"})
-	loggerInstance := createLogger(b, redactor)
+	loggerInstance := createBufferLogger(b, redactor)
 	executeBenchmark(b, loggerInstance)
 }
 
 func BenchmarkNewBufferLoggerWithRedactorWithValueRedactions(b *testing.B) {
 	redactor := NewRedactor(&bytes.Buffer{})
 	redactor.AddValueRedactions([]string{"replaceme"})
-	loggerInstance := createLogger(b, redactor)
+	loggerInstance := createBufferLogger(b, redactor)
 	executeBenchmark(b, loggerInstance)
 }
 
-func createLogger(b *testing.B, redactor RedactingLogger) logger.Logger {
-	bufferLogger, err := NewBufferLogger("test", "console", InfoLevel, redactor)
+func createBufferLogger(b *testing.B, redactor *Redactor) *BufferLogger {
+	var err error
+	var bufferLogger *BufferLogger
+	if redactor != nil {
+		bufferLogger, err = NewBufferLoggerWithRedactor("test", "json", InfoLevel, redactor)
+	} else {
+		bufferLogger, err = NewBufferLogger("test", "json", InfoLevel)
+	}
 	if err != nil {
 		b.FailNow()
 		return nil
 	}
-	return bufferLogger.Logger
+	return bufferLogger
 }
 
-func executeBenchmark(b *testing.B, loggerInstance logger.Logger) {
+func executeBenchmark(b *testing.B, bufferLogger *BufferLogger) {
 	for i := 0; i < b.N; i++ {
-		loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
+		bufferLogger.Logger.InfoWith("Check", "password", "123456", "replaceme", "55")
 	}
 }
 

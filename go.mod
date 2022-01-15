@@ -1,13 +1,11 @@
 module github.com/nuclio/zap
 
-go 1.14
+go 1.17
 
 require (
-	github.com/mattn/go-colorable v0.1.7 // indirect
-	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
+	github.com/liranbg/uberzap v1.20.0-nuclio.1
+	github.com/logrusorgru/aurora/v3 v3.0.0
+	github.com/nuclio/errors v0.0.3
 	github.com/nuclio/logger v0.0.1
-	github.com/pavius/zap v1.4.2-0.20180228181622-8d52692529b8
-	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.6.1
-	go.uber.org/multierr v1.6.0 // indirect
+	github.com/stretchr/testify v1.7.0
 )

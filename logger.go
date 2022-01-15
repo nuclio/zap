@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mgutz/ansi"
+	"github.com/liranbg/uberzap"
+	"github.com/liranbg/uberzap/zapcore"
+	"github.com/logrusorgru/aurora/v3"
 	"github.com/nuclio/logger"
-	"github.com/pavius/zap"
-	"github.com/pavius/zap/zapcore"
 )
 
 type VarGroupMode string
@@ -80,23 +80,17 @@ const (
 	FatalLevel  Level = Level(zapcore.FatalLevel)
 )
 
-type writerWrapper struct {
-	io.Writer
-}
-
-func (w writerWrapper) Sync() error {
-	return nil
-}
-
 // NuclioZap is a concrete implementation of the nuclio logger interface, using zap
 type NuclioZap struct {
 	*zap.SugaredLogger
 	atomicLevel         zap.AtomicLevel
+	outputWriter        io.Writer
+	errorOutputWriter   io.Writer
 	coloredLevelDebug   string
 	coloredLevelInfo    string
 	coloredLevelWarn    string
 	coloredLevelError   string
-	colorLoggerName     func(string) string
+	colorLoggerName     aurora.Color
 	customEncoderConfig *EncoderConfig
 	encoding            string
 
@@ -110,14 +104,17 @@ func NewNuclioZap(name string,
 	sink io.Writer,
 	errSink io.Writer,
 	level Level) (*NuclioZap, error) {
+
+	if customEncoderConfig == nil {
+		customEncoderConfig = NewEncoderConfig()
+	}
+
 	newNuclioZap := &NuclioZap{
 		atomicLevel:         zap.NewAtomicLevelAt(zapcore.Level(level)),
 		customEncoderConfig: customEncoderConfig,
 		encoding:            encoding,
-	}
-
-	if customEncoderConfig == nil {
-		customEncoderConfig = NewEncoderConfig()
+		outputWriter:        sink,
+		errorOutputWriter:   errSink,
 	}
 
 	// create an encoder configuration
@@ -129,8 +126,8 @@ func NewNuclioZap(name string,
 		Development:        true,
 		Encoding:           encoding,
 		EncoderConfig:      *encoderConfig,
-		OutputWriters:      []zapcore.WriteSyncer{writerWrapper{sink}},
-		ErrorOutputWriters: []zapcore.WriteSyncer{writerWrapper{errSink}},
+		OutputWriters:      []zapcore.WriteSyncer{zapcore.AddSync(newNuclioZap.outputWriter)},
+		ErrorOutputWriters: []zapcore.WriteSyncer{zapcore.AddSync(newNuclioZap.errorOutputWriter)},
 		DisableStacktrace:  true,
 	}
 
@@ -154,7 +151,7 @@ func NewNuclioZap(name string,
 	return newNuclioZap, nil
 }
 
-// We use this istead of testing.Verbose since we don't want to get testing flags in our code
+// We use this instead of testing.Verbose since we don't want to get testing flags in our code
 func isVerboseTesting() bool {
 	for _, arg := range os.Args {
 		if arg == "-test.v=true" || arg == "-test.v" {
@@ -174,23 +171,14 @@ func NewNuclioZapTest(name string) (*NuclioZap, error) {
 		loggerLevel = InfoLevel
 	}
 
-	return NewNuclioZapCmd(name, loggerLevel, nil)
+	loggerRedactor := NewRedactor(os.Stdout)
+	loggerRedactor.Disable()
+
+	return NewNuclioZapCmd(name, loggerLevel, loggerRedactor)
 }
 
 // NewNuclioZapCmd creates a logger pre-configured for commands
-func NewNuclioZapCmd(name string, level Level, redactor RedactingLogger) (*NuclioZap, error) {
-	var writer io.Writer = os.Stdout
-
-	// if redactor is given, use its writer
-	if redactor != nil {
-
-		// fill out redactor output sink
-		if redactor.GetOutput() == nil {
-			redactor.SetOutput(writer)
-		}
-
-		writer = redactor
-	}
+func NewNuclioZapCmd(name string, level Level, writer io.Writer) (*NuclioZap, error) {
 	return NewNuclioZap(name, "console", nil, writer, writer, level)
 }
 
@@ -212,6 +200,14 @@ func GetLevelByName(levelName string) Level {
 	default:
 		return Level(zapcore.DebugLevel)
 	}
+}
+
+func (nz *NuclioZap) GetRedactor() *Redactor {
+	redactor, ok := nz.outputWriter.(*Redactor)
+	if ok {
+		return redactor
+	}
+	return nil
 }
 
 // SetLevel sets the logging level
@@ -352,7 +348,7 @@ func (nz *NuclioZap) encodeLoggerName(loggerName string, enc zapcore.PrimitiveAr
 	}
 
 	// just truncate
-	enc.AppendString(nz.colorLoggerName(encodedLoggerName))
+	enc.AppendString(aurora.Colorize(encodedLoggerName, nz.colorLoggerName).String())
 }
 
 func (nz *NuclioZap) encodeStdoutLevel(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
@@ -376,12 +372,11 @@ func (nz *NuclioZap) encodeStdoutTime(t time.Time, enc zapcore.PrimitiveArrayEnc
 }
 
 func (nz *NuclioZap) initializeColors() {
-	nz.coloredLevelDebug = ansi.Color("(D)", "green")
-	nz.coloredLevelInfo = ansi.Color("(I)", "blue")
-	nz.coloredLevelWarn = ansi.Color("(W)", "yellow")
-	nz.coloredLevelError = ansi.Color("(E)", "red")
-
-	nz.colorLoggerName = ansi.ColorFunc("white")
+	nz.coloredLevelDebug = aurora.Green("(D)").String()
+	nz.coloredLevelInfo = aurora.Blue("(I)").String()
+	nz.coloredLevelWarn = aurora.Yellow("(W)").String()
+	nz.coloredLevelError = aurora.Red("(E)").String()
+	nz.colorLoggerName = aurora.WhiteFg
 }
 
 func (nz *NuclioZap) getEncoderConfig(encoding string, encoderConfig *EncoderConfig) *zapcore.EncoderConfig {
@@ -398,7 +393,8 @@ func (nz *NuclioZap) getEncoderConfig(encoding string, encoderConfig *EncoderCon
 			EncodeTime:       nz.encodeStdoutTime,
 			EncodeDuration:   zapcore.StringDurationEncoder,
 			EncodeCaller:     func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
-			EncodeLoggerName: nz.encodeLoggerName,
+			EncodeName:       nz.encodeLoggerName,
+			ConsoleSeparator: " ",
 		}
 	}
 
@@ -411,18 +407,18 @@ func (nz *NuclioZap) getEncoderConfig(encoding string, encoderConfig *EncoderCon
 	}
 
 	return &zapcore.EncoderConfig{
-		TimeKey:          encoderConfig.JSON.TimeFieldName,
-		LevelKey:         "level",
-		NameKey:          "name",
-		CallerKey:        "",
-		MessageKey:       "message",
-		StacktraceKey:    "stack",
-		LineEnding:       encoderConfig.JSON.LineEnding,
-		EncodeLevel:      zapcore.LowercaseLevelEncoder,
-		EncodeTime:       timeEncoder,
-		EncodeDuration:   zapcore.SecondsDurationEncoder,
-		EncodeCaller:     func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
-		EncodeLoggerName: zapcore.FullLoggerNameEncoder,
+		TimeKey:        encoderConfig.JSON.TimeFieldName,
+		NameKey:        "name",
+		LevelKey:       "level",
+		CallerKey:      "",
+		MessageKey:     "message",
+		StacktraceKey:  "stack",
+		LineEnding:     encoderConfig.JSON.LineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     timeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
+		EncodeName:     zapcore.FullNameEncoder,
 	}
 }
 

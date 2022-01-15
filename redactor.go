@@ -22,23 +22,11 @@ import (
 
 type RedactingLogger interface {
 
-	// SetOutput sets redactor output
-	SetOutput(io.Writer)
-
 	// GetOutput returns redactor writer
 	GetOutput() io.Writer
 
-	// Write writes to output
-	Write(p []byte) (n int, err error)
-
-	// AddRedactions redacts simple strings
-	AddRedactions(redactions []string)
-
-	// AddValueRedactions redacts key:[value] or key=[value] kind of strings
-	AddValueRedactions(valueRedactions []string)
-
-	// SetDisabled turns logger redaction on/off
-	SetDisabled(disable bool)
+	// GetRedactor returns redactor instance
+	GetRedactor() *Redactor
 }
 
 type Redactor struct {
@@ -68,27 +56,17 @@ func NewRedactor(output io.Writer) *Redactor {
 	return redactor
 }
 
+// SetOutput sets redactor output
 func (r *Redactor) SetOutput(output io.Writer) {
 	r.output = output
 }
 
+// GetOutput returns redactor writer
 func (r *Redactor) GetOutput() io.Writer {
 	return r.output
 }
 
-func (r *Redactor) GetRedactions() [][]byte {
-	return r.redactions
-}
-
-func (r *Redactor) SetDisabled(disable bool) {
-	r.disabled = disable
-	if disable {
-		r.redactFunc = r.redactDisabled
-	} else {
-		r.redactFunc = r.redactEnabled
-	}
-}
-
+// AddValueRedactions redacts key:[value] or key=[value] kind of strings
 func (r *Redactor) AddValueRedactions(valueRedactions []string) {
 	for _, valueRedaction := range valueRedactions {
 		r.valueRedactions = append(r.valueRedactions, []byte(valueRedaction))
@@ -97,6 +75,7 @@ func (r *Redactor) AddValueRedactions(valueRedactions []string) {
 	r.prepareReplacements()
 }
 
+// AddRedactions redacts simple strings
 func (r *Redactor) AddRedactions(redactions []string) {
 	var nonEmptyRedactions []string
 
@@ -112,8 +91,23 @@ func (r *Redactor) AddRedactions(redactions []string) {
 	r.redactions = r.removeDuplicates(r.redactions)
 }
 
+// SetDisabled turns logger redaction on/off
+func (r *Redactor) SetDisabled(disable bool) {
+	r.disabled = disable
+	if disable {
+		r.redactFunc = r.redactDisabled
+	} else {
+		r.redactFunc = r.redactEnabled
+	}
+}
+
+// Write writes to output
 func (r *Redactor) Write(p []byte) (n int, err error) {
 	return r.redactFunc(p)
+}
+
+func (r *Redactor) GetRedactions() [][]byte {
+	return r.redactions
 }
 
 func (r *Redactor) Enable() {
