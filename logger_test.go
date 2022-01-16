@@ -13,12 +13,11 @@ type LoggerTestSuite struct {
 
 func (suite *LoggerTestSuite) TestRedactor() {
 	output := &bytes.Buffer{}
-	redactor := NewRedactor(output)
-	redactor.AddValueRedactions([]string{"password"})
-	redactor.AddRedactions([]string{"replaceme"})
 	loggerInstance, err := NewNuclioZapCmd("redacted-test",
 		InfoLevel,
-		redactor)
+		NewRedactor(output))
+	loggerInstance.GetRedactor().AddValueRedactions([]string{"password"})
+	loggerInstance.GetRedactor().AddRedactions([]string{"replaceme"})
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
 	// log
