@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	gojson "github.com/goccy/go-json"
 	"github.com/liranbg/uberzap"
 	"github.com/liranbg/uberzap/zapcore"
 	"github.com/logrusorgru/aurora/v3"
@@ -419,6 +420,9 @@ func (nz *NuclioZap) getEncoderConfig(encoding string, encoderConfig *EncoderCon
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
 		EncodeName:     zapcore.FullNameEncoder,
+		NewReflectedEncoder: func(writer io.Writer) zapcore.ReflectedEncoder {
+			return gojson.NewEncoder(writer)
+		},
 	}
 }
 
