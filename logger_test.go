@@ -11,6 +11,24 @@ type LoggerTestSuite struct {
 	suite.Suite
 }
 
+func (suite *LoggerTestSuite) TestRedactor() {
+	output := &bytes.Buffer{}
+	loggerInstance, err := NewNuclioZapCmd("redacted-test",
+		InfoLevel,
+		NewRedactor(output))
+	loggerInstance.GetRedactor().AddValueRedactions([]string{"password"})
+	loggerInstance.GetRedactor().AddRedactions([]string{"replaceme"})
+	suite.Require().NoError(err, "Failed creating buffer logger")
+
+	// log
+	loggerInstance.InfoWith("Check", "password", "123456", "replaceme", "55")
+
+	// verify (debug should be filtered)
+	suite.Require().Contains(output.String(), "Check")
+	suite.Require().NotContains(output.String(), "123456")
+	suite.Require().NotContains(output.String(), "replaceme")
+}
+
 func (suite *LoggerTestSuite) TestPrepareVars() {
 	zap := NuclioZap{}
 	vars := []interface{}{

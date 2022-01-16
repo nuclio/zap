@@ -17,6 +17,7 @@ limitations under the License.
 package nucliozap
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -25,6 +26,34 @@ import (
 
 type BufferLoggerTestSuite struct {
 	suite.Suite
+}
+
+func (suite *BufferLoggerTestSuite) TestRedactor() {
+	redactor := NewRedactor(&bytes.Buffer{})
+	redactor.AddValueRedactions([]string{"password"})
+	redactor.AddRedactions([]string{"replaceme"})
+	bufferLogger, err := NewBufferLoggerWithRedactor("test", "json", InfoLevel, redactor)
+	suite.Require().NoError(err, "Failed creating buffer logger")
+
+	bufferLogger.Logger.customEncoderConfig = NewEncoderConfig()
+	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName = "testVars"
+	bufferLogger.Logger.customEncoderConfig.JSON.VarGroupMode = VarGroupModeStructured
+	bufferLogger.Logger.prepareVarsCallback = bufferLogger.Logger.prepareVarsStructured
+
+	// log
+	bufferLogger.Logger.InfoWith("Check", "password", "123456", "replaceme", "55")
+
+	// get log entries
+	logEntries, err := bufferLogger.GetLogEntries()
+	suite.Require().NoError(err, "Failed to get log entries")
+
+	// verify (debug should be filtered)
+	suite.Require().Equal("Check", logEntries[0]["message"])
+	suite.Require().Equal("info", logEntries[0]["level"])
+	suite.Require().Equal(map[string]interface{}{
+		"*****":    "55",
+		"password": "[redacted]",
+	}, logEntries[0][bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName])
 }
 
 func (suite *BufferLoggerTestSuite) TestJSONEncoding() {
@@ -169,6 +198,62 @@ func (suite *BufferLoggerPoolTestSuite) TestAllocation() {
 
 	// allocated logger should be zero'd out
 	suite.Require().Equal(0, bufferLogger.Buffer.Len())
+}
+
+// ============
+// Benchmarking
+// ============
+
+func BenchmarkNewBufferLogger(b *testing.B) {
+	loggerInstance := createBufferLogger(b, nil)
+	executeBenchmark(b, loggerInstance)
+}
+
+func BenchmarkNewBufferLoggerWithRedactor(b *testing.B) {
+	loggerInstance := createBufferLogger(b, NewRedactor(&bytes.Buffer{}))
+	executeBenchmark(b, loggerInstance)
+}
+
+func BenchmarkNewBufferLoggerWithDisabledRedactor(b *testing.B) {
+	redactor := NewRedactor(&bytes.Buffer{})
+	redactor.SetDisabled(true)
+	loggerInstance := createBufferLogger(b, redactor)
+	executeBenchmark(b, loggerInstance)
+}
+
+func BenchmarkNewBufferLoggerWithRedactorWithRedactions(b *testing.B) {
+	redactor := NewRedactor(&bytes.Buffer{})
+	redactor.AddRedactions([]string{"replaceme"})
+	loggerInstance := createBufferLogger(b, redactor)
+	executeBenchmark(b, loggerInstance)
+}
+
+func BenchmarkNewBufferLoggerWithRedactorWithValueRedactions(b *testing.B) {
+	redactor := NewRedactor(&bytes.Buffer{})
+	redactor.AddValueRedactions([]string{"replaceme"})
+	loggerInstance := createBufferLogger(b, redactor)
+	executeBenchmark(b, loggerInstance)
+}
+
+func createBufferLogger(b *testing.B, redactor *Redactor) *BufferLogger {
+	var err error
+	var bufferLogger *BufferLogger
+	if redactor != nil {
+		bufferLogger, err = NewBufferLoggerWithRedactor("test", "json", InfoLevel, redactor)
+	} else {
+		bufferLogger, err = NewBufferLogger("test", "json", InfoLevel)
+	}
+	if err != nil {
+		b.FailNow()
+		return nil
+	}
+	return bufferLogger
+}
+
+func executeBenchmark(b *testing.B, bufferLogger *BufferLogger) {
+	for i := 0; i < b.N; i++ {
+		bufferLogger.Logger.InfoWith("Check", "password", "123456", "replaceme", "55")
+	}
 }
 
 func TestBufferLoggerTestSuite(t *testing.T) {

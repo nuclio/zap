@@ -22,7 +22,7 @@ import (
 	"github.com/nuclio/logger"
 )
 
-// a logger that multiplexes logs towards multiple loggers
+// MuxLogger multiplexes logs towards multiple loggers
 type MuxLogger struct {
 	loggers []logger.Logger
 }
@@ -40,98 +40,98 @@ func (ml *MuxLogger) GetLoggers() []logger.Logger {
 }
 
 func (ml *MuxLogger) Error(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.Error(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.Error(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) ErrorCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.ErrorCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.ErrorCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) Warn(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.Warn(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.Warn(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) WarnCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.WarnCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.WarnCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) Info(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.Info(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.Info(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) InfoCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.InfoCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.InfoCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) Debug(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.Debug(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.Debug(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) DebugCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.DebugCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.DebugCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) ErrorWith(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.ErrorWith(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.ErrorWith(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) ErrorWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.ErrorWithCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.ErrorWithCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) WarnWith(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.WarnWith(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.WarnWith(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) WarnWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.WarnWithCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.WarnWithCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) InfoWith(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.InfoWith(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.InfoWith(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) InfoWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.InfoWithCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.InfoWithCtx(ctx, format, vars...)
 	}
 }
 
 func (ml *MuxLogger) DebugWith(format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.DebugWith(format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.DebugWith(format, vars...)
 	}
 }
 
 func (ml *MuxLogger) DebugWithCtx(ctx context.Context, format interface{}, vars ...interface{}) {
-	for _, logger := range ml.loggers {
-		logger.DebugWithCtx(ctx, format, vars...)
+	for _, loggerInstance := range ml.loggers {
+		loggerInstance.DebugWithCtx(ctx, format, vars...)
 	}
 }
 
