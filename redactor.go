@@ -124,12 +124,14 @@ func (r *Redactor) prepareReplacements() {
 	// w/wo single/double quotes
 	// golang regex doesn't support lookarounds, so we will check things manually
 	matchKeyWithSeparatorTemplate := `\\*[\'"]?(?i)%s\\*[\'"]?\s*[=:]\s*`
-	matchValue := `\'[^\']*?\'|\"[^\"]*\"|\S*`
+	matchValue := `\'[^\']*?\'|\"[^\"]*\"|\[[^\]]*?\]|\{[^\}]*?\}|\S*`
 
-	for _, redactionField := range r.valueRedactions {
+	// reset to avoid duplicates
+	r.valueRedactionsRegexps = make([]regexp.Regexp, len(r.valueRedactions))
+	for idx, redactionField := range r.valueRedactions {
 		matchKeyWithSeparator := fmt.Sprintf(matchKeyWithSeparatorTemplate, redactionField)
-		r.valueRedactionsRegexps = append(r.valueRedactionsRegexps,
-			*regexp.MustCompile(fmt.Sprintf(`(%s)(%s)`, matchKeyWithSeparator, matchValue)),
+		r.valueRedactionsRegexps[idx] = *regexp.MustCompile(
+			fmt.Sprintf(`(%s)(%s)`, matchKeyWithSeparator, matchValue),
 		)
 	}
 
