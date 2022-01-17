@@ -29,9 +29,26 @@ type BufferLoggerTestSuite struct {
 }
 
 func (suite *BufferLoggerTestSuite) TestRedactor() {
+	someStruct := struct {
+		Headers   map[string][]string `json:"headers"`
+		TopSecret interface{}         `json:"topSecret"`
+	}{
+		Headers: map[string][]string{
+			"cookie": {
+				"session=some-secret-session",
+			},
+		},
+		TopSecret: struct {
+			Address string `json:"address"`
+		}{
+			Address: "some-secret-address",
+		},
+	}
 	redactor := NewRedactor(&bytes.Buffer{})
 	redactor.AddValueRedactions([]string{"password"})
 	redactor.AddRedactions([]string{"replaceme"})
+	redactor.AddValueRedactions([]string{"cookie"})
+	redactor.AddValueRedactions([]string{"topSecret"})
 	bufferLogger, err := NewBufferLoggerWithRedactor("test", "json", InfoLevel, redactor)
 	suite.Require().NoError(err, "Failed creating buffer logger")
 
@@ -41,7 +58,10 @@ func (suite *BufferLoggerTestSuite) TestRedactor() {
 	bufferLogger.Logger.prepareVarsCallback = bufferLogger.Logger.prepareVarsStructured
 
 	// log
-	bufferLogger.Logger.InfoWith("Check", "password", "123456", "replaceme", "55")
+	bufferLogger.Logger.InfoWith("Check",
+		"password", "123456",
+		"replaceme", "55",
+		"complexStruct", someStruct)
 
 	// get log entries
 	logEntries, err := bufferLogger.GetLogEntries()
@@ -53,6 +73,12 @@ func (suite *BufferLoggerTestSuite) TestRedactor() {
 	suite.Require().Equal(map[string]interface{}{
 		"*****":    "55",
 		"password": "[redacted]",
+		"complexStruct": map[string]interface{}{
+			"headers": map[string]interface{}{
+				"cookie": "[redacted]",
+			},
+			"topSecret": "[redacted]",
+		},
 	}, logEntries[0][bufferLogger.Logger.customEncoderConfig.JSON.VarGroupName])
 }
 
