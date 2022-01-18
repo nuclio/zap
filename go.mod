@@ -3,7 +3,6 @@ module github.com/nuclio/zap
 go 1.17
 
 require (
-	github.com/goccy/go-json v0.9.3
 	github.com/liranbg/uberzap v1.20.0-nuclio.1
 	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/nuclio/errors v0.0.3
