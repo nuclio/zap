@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	gojson "github.com/goccy/go-json"
 	"github.com/liranbg/uberzap"
 	"github.com/liranbg/uberzap/zapcore"
 	"github.com/logrusorgru/aurora/v3"
@@ -46,6 +45,7 @@ type EncoderConfigJSON struct {
 	VarGroupMode      VarGroupMode
 	TimeFieldName     string
 	TimeFieldEncoding string
+	ReflectedEncoder  func(writer io.Writer) zapcore.ReflectedEncoder
 }
 
 type EncoderConfigConsole struct {
@@ -63,6 +63,7 @@ func NewEncoderConfig() *EncoderConfig {
 			TimeFieldName:     "time",
 			TimeFieldEncoding: "epoch-millis",
 			VarGroupMode:      DefaultVarGroupMode,
+			ReflectedEncoder:  nil,
 		},
 	}
 }
@@ -408,21 +409,19 @@ func (nz *NuclioZap) getEncoderConfig(encoding string, encoderConfig *EncoderCon
 	}
 
 	return &zapcore.EncoderConfig{
-		TimeKey:        encoderConfig.JSON.TimeFieldName,
-		NameKey:        "name",
-		LevelKey:       "level",
-		CallerKey:      "",
-		MessageKey:     "message",
-		StacktraceKey:  "stack",
-		LineEnding:     encoderConfig.JSON.LineEnding,
-		EncodeLevel:    zapcore.LowercaseLevelEncoder,
-		EncodeTime:     timeEncoder,
-		EncodeDuration: zapcore.SecondsDurationEncoder,
-		EncodeCaller:   func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
-		EncodeName:     zapcore.FullNameEncoder,
-		NewReflectedEncoder: func(writer io.Writer) zapcore.ReflectedEncoder {
-			return gojson.NewEncoder(writer)
-		},
+		TimeKey:             encoderConfig.JSON.TimeFieldName,
+		NameKey:             "name",
+		LevelKey:            "level",
+		CallerKey:           "",
+		MessageKey:          "message",
+		StacktraceKey:       "stack",
+		LineEnding:          encoderConfig.JSON.LineEnding,
+		EncodeLevel:         zapcore.LowercaseLevelEncoder,
+		EncodeTime:          timeEncoder,
+		EncodeDuration:      zapcore.SecondsDurationEncoder,
+		EncodeCaller:        func(zapcore.EntryCaller, zapcore.PrimitiveArrayEncoder) {},
+		EncodeName:          zapcore.FullNameEncoder,
+		NewReflectedEncoder: encoderConfig.JSON.ReflectedEncoder,
 	}
 }
 
