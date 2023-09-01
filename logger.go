@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/liranbg/uberzap"
-	"github.com/liranbg/uberzap/zapcore"
-	"github.com/logrusorgru/aurora/v3"
+	"github.com/logrusorgru/aurora/v4"
 	"github.com/nuclio/logger"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type VarGroupMode string
@@ -121,24 +121,28 @@ func NewNuclioZap(name string,
 
 	// create an encoder configuration
 	encoderConfig := newNuclioZap.getEncoderConfig(encoding, customEncoderConfig)
+	var encoder zapcore.Encoder
 
-	// create a sane configuration
-	config := zap.Config{
-		Level:              newNuclioZap.atomicLevel,
-		Development:        true,
-		Encoding:           encoding,
-		EncoderConfig:      *encoderConfig,
-		OutputWriters:      []zapcore.WriteSyncer{zapcore.AddSync(newNuclioZap.outputWriter)},
-		ErrorOutputWriters: []zapcore.WriteSyncer{zapcore.AddSync(newNuclioZap.errorOutputWriter)},
-		DisableStacktrace:  true,
+	switch encoding {
+	case "json":
+		encoder = zapcore.NewJSONEncoder(*encoderConfig)
+	case "console":
+		encoder = zapcore.NewConsoleEncoder(*encoderConfig)
+	default:
+		return nil, fmt.Errorf("unknown encoding: %s", encoding)
 	}
 
-	newZapLogger, err := config.Build()
-	if err != nil {
-		return nil, err
+	opts := []zap.Option{
+		zap.ErrorOutput(zapcore.AddSync(newNuclioZap.errorOutputWriter)),
+		zap.Development(),
 	}
 
-	newNuclioZap.SugaredLogger = newZapLogger.Sugar().Named(name)
+	zlogger := zapcore.NewCore(encoder,
+		zapcore.AddSync(newNuclioZap.outputWriter),
+		newNuclioZap.atomicLevel,
+	)
+
+	newNuclioZap.SugaredLogger = zap.New(zlogger, opts...).Sugar().Named(name)
 
 	// initialize coloring by level
 	newNuclioZap.initializeColors()
