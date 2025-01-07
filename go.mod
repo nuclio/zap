@@ -1,6 +1,6 @@
 module github.com/nuclio/zap
 
-go 1.20
+go 1.23
 
 require (
 	github.com/logrusorgru/aurora/v4 v4.0.0

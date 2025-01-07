@@ -39,6 +39,11 @@ const (
 
 const DefaultVarGroupMode = VarGroupModeFlattened
 
+const (
+	RequestIDKey = "RequestID"
+	ContextIDKey = "ContextID"
+)
+
 type EncoderConfigJSON struct {
 	LineEnding        string
 	VarGroupName      string
@@ -434,21 +439,26 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 		return vars
 	}
 
-	// get request ID from context
-	requestID := ctx.Value("RequestID")
+	for key, name := range map[string]string{
+		RequestIDKey: "requestID",
+		ContextIDKey: "ctx",
+	} {
+		// get context value
+		value := ctx.Value(key)
 
-	// if not set, don't add it to vars
-	if requestID == nil || requestID == "" {
-		return vars
+		// if not set, don't add it to vars
+		if value == nil || value == "" {
+			continue
+		}
+
+		// create a slice 2 slots larger
+		varsWithContext := make([]interface{}, 0, len(vars)+2)
+		varsWithContext = append(varsWithContext, name)
+		varsWithContext = append(varsWithContext, value)
+		vars = append(varsWithContext, vars...)
 	}
 
-	// create a slice 2 slots larger
-	varsWithContext := make([]interface{}, 0, len(vars)+2)
-	varsWithContext = append(varsWithContext, "requestID")
-	varsWithContext = append(varsWithContext, requestID)
-	varsWithContext = append(varsWithContext, vars...)
-
-	return varsWithContext
+	return vars
 }
 
 func (nz *NuclioZap) getFormatWithContext(ctx context.Context, format interface{}) string {
