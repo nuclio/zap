@@ -39,9 +39,11 @@ const (
 
 const DefaultVarGroupMode = VarGroupModeFlattened
 
+type ContextKey int
+
 const (
-	RequestIDKey = "RequestID"
-	ContextIDKey = "ContextID"
+	RequestIDKey ContextKey = iota
+	ContextIDKey
 )
 
 type EncoderConfigJSON struct {
@@ -439,9 +441,12 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 		return vars
 	}
 
-	for key, name := range map[string]string{
+	for key, name := range map[interface{}]string{
 		RequestIDKey: "requestID",
 		ContextIDKey: "ctx",
+
+		// For backwards compatibility
+		"RequestID": "requestID",
 	} {
 		// get context value
 		value := ctx.Value(key)
