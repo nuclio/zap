@@ -95,6 +95,17 @@ func (suite *LoggerTestSuite) TestAddContextToVars() {
 	suite.Require().Contains(vars, "some")
 	suite.Require().Contains(vars, "thing")
 
+	// validate it skips existing values
+	existingRequestID := "987654"
+	vars = zap.addContextToVars(ctx, []interface{}{"some", "thing", "requestID", existingRequestID})
+	for _, expected := range []string{
+		"requestID",
+		existingRequestID,
+		"ctx",
+		contextID,
+	} {
+		suite.Require().Contains(vars, expected)
+	}
 }
 
 func TestLoggerTestSuite(t *testing.T) {

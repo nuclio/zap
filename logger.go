@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -453,6 +454,11 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 
 		// if not set, don't add it to vars
 		if value == nil || value == "" {
+			continue
+		}
+
+		// don't override the value if it's already set
+		if slices.Contains(vars, interface{}(name)) {
 			continue
 		}
 
