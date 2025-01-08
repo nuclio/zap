@@ -40,11 +40,12 @@ const (
 
 const DefaultVarGroupMode = VarGroupModeFlattened
 
-type ContextKey int
+type ContextKey string
 
 const (
-	RequestIDKey ContextKey = iota
-	ContextIDKey
+	RequestIDKey            ContextKey = "requestID"
+	DeperecatedRequestIDKey ContextKey = "RequestID"
+	ContextIDKey            ContextKey = "ctx"
 )
 
 type EncoderConfigJSON struct {
@@ -442,15 +443,24 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 		return vars
 	}
 
-	for key, name := range map[interface{}]string{
-		RequestIDKey: "requestID",
-		ContextIDKey: "ctx",
+	for _, key := range []ContextKey{
+		RequestIDKey,
+		ContextIDKey,
 
-		// For backwards compatibility
-		"RequestID": "requestID",
+		// Deprecated, for backwards compatibility
+		DeperecatedRequestIDKey,
 	} {
+
+		var value interface{}
+
 		// get context value
-		value := ctx.Value(key)
+		if key == DeperecatedRequestIDKey {
+			value = ctx.Value(string(key))
+			// move to lowercase
+			key = RequestIDKey
+		} else {
+			value = ctx.Value(key)
+		}
 
 		// if not set, don't add it to vars
 		if value == nil || value == "" {
@@ -458,13 +468,13 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 		}
 
 		// don't override the value if it's already set
-		if slices.Contains(vars, interface{}(name)) {
+		if slices.Contains(vars, interface{}(key)) {
 			continue
 		}
 
 		// create a slice 2 slots larger
 		varsWithContext := make([]interface{}, 0, len(vars)+2)
-		varsWithContext = append(varsWithContext, name)
+		varsWithContext = append(varsWithContext, key)
 		varsWithContext = append(varsWithContext, value)
 		vars = append(varsWithContext, vars...)
 	}

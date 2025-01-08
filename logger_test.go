@@ -82,26 +82,28 @@ func (suite *LoggerTestSuite) TestAddContextToVars() {
 	contextID := "abcdef"
 	ctx = context.WithValue(ctx, RequestIDKey, requestID)
 	ctx = context.WithValue(ctx, ContextIDKey, contextID)
+	ctx = context.WithValue(ctx, "RequestID", "asdfgh") // nolint: staticcheck
 
 	vars := zap.addContextToVars(ctx, []interface{}{"some", "thing"})
-	for _, expected := range []string{
-		"requestID",
+	for _, expected := range []interface{}{
+		RequestIDKey,
 		requestID,
-		"ctx",
+		ContextIDKey,
 		contextID,
 	} {
 		suite.Require().Contains(vars, expected)
 	}
+	suite.Require().NotContains(vars, "RequestID")
 	suite.Require().Contains(vars, "some")
 	suite.Require().Contains(vars, "thing")
 
 	// validate it skips existing values
 	existingRequestID := "987654"
 	vars = zap.addContextToVars(ctx, []interface{}{"some", "thing", "requestID", existingRequestID})
-	for _, expected := range []string{
-		"requestID",
+	for _, expected := range []interface{}{
+		RequestIDKey,
 		existingRequestID,
-		"ctx",
+		ContextIDKey,
 		contextID,
 	} {
 		suite.Require().Contains(vars, expected)
