@@ -34,7 +34,7 @@ lint: modules  ## Code linting
 		&& chmod +x $(GOPATH)/bin/impi)
 
 	@test -e $(GOPATH)/bin/golangci-lint || \
-	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.54.2)
+	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.63.4)
 
 	@echo Verifying imports...
 	$(GOPATH)/bin/impi \

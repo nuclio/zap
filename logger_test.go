@@ -3,7 +3,9 @@ Copyright 2018 The Nuclio Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,6 +16,7 @@ package nucliozap
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -68,6 +71,43 @@ func (suite *LoggerTestSuite) TestGetChild() {
 	childLogger.InfoWith("Test", "some", "thing")
 	suite.Require().Contains(writer.String(), `"extra":{"some":"thing"}`)
 	suite.Require().Contains(writer.String(), `"name":"test.some-child"`)
+}
+
+func (suite *LoggerTestSuite) TestAddContextToVars() {
+	zap, err := NewNuclioZap("test", "json", nil, &bytes.Buffer{}, &bytes.Buffer{}, DebugLevel)
+	suite.Require().NoError(err)
+	ctx := context.Background()
+
+	requestID := "123456"
+	contextID := "abcdef"
+	ctx = context.WithValue(ctx, RequestIDKey, requestID)
+	ctx = context.WithValue(ctx, ContextIDKey, contextID)
+	ctx = context.WithValue(ctx, "RequestID", "asdfgh") // nolint: staticcheck
+
+	vars := zap.addContextToVars(ctx, []interface{}{"some", "thing"})
+	for _, expected := range []interface{}{
+		RequestIDKey,
+		requestID,
+		ContextIDKey,
+		contextID,
+	} {
+		suite.Require().Contains(vars, expected)
+	}
+	suite.Require().NotContains(vars, "RequestID")
+	suite.Require().Contains(vars, "some")
+	suite.Require().Contains(vars, "thing")
+
+	// validate it skips existing values
+	existingRequestID := "987654"
+	vars = zap.addContextToVars(ctx, []interface{}{"some", "thing", "requestID", existingRequestID})
+	for _, expected := range []interface{}{
+		RequestIDKey,
+		existingRequestID,
+		ContextIDKey,
+		contextID,
+	} {
+		suite.Require().Contains(vars, expected)
+	}
 }
 
 func TestLoggerTestSuite(t *testing.T) {
