@@ -86,9 +86,9 @@ func (suite *LoggerTestSuite) TestAddContextToVars() {
 
 	vars := zap.addContextToVars(ctx, []interface{}{"some", "thing"})
 	for _, expected := range []interface{}{
-		RequestIDKey,
+		string(RequestIDKey),
 		requestID,
-		ContextIDKey,
+		string(ContextIDKey),
 		contextID,
 	} {
 		suite.Require().Contains(vars, expected)
@@ -101,9 +101,9 @@ func (suite *LoggerTestSuite) TestAddContextToVars() {
 	existingRequestID := "987654"
 	vars = zap.addContextToVars(ctx, []interface{}{"some", "thing", "requestID", existingRequestID})
 	for _, expected := range []interface{}{
-		RequestIDKey,
+		string(RequestIDKey),
 		existingRequestID,
-		ContextIDKey,
+		string(ContextIDKey),
 		contextID,
 	} {
 		suite.Require().Contains(vars, expected)
