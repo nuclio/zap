@@ -472,11 +472,8 @@ func (nz *NuclioZap) addContextToVars(ctx context.Context, vars []interface{}) [
 			continue
 		}
 
-		// create a slice 2 slots larger
-		varsWithContext := make([]interface{}, 0, len(vars)+2)
-		varsWithContext = append(varsWithContext, key)
-		varsWithContext = append(varsWithContext, value)
-		vars = append(varsWithContext, vars...)
+		// append key and value to the beginning of the vars
+		vars = append([]interface{}{string(key), value}, vars...)
 	}
 
 	return vars
